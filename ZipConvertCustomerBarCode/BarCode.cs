@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Linq;
@@ -73,12 +74,12 @@ namespace ZipConvertCustomerBarCode
         /// <summary>
         /// 指定したパスにカスタマバーコードを出力する。
         /// </summary>
-        /// <param name="postcode">郵便番号</param>
+        /// <param name="postCode">郵便番号(ハイフンなし半角数字7桁)</param>
         /// <param name="zip">住所</param>
         /// <param name="outputPath">出力先</param>
-        public static void Export(string postcode, string zip, string outputPath)
+        public static void Export(string postCode, string zip, string outputPath)
         {
-            var code = ConvertCustomerBarCode(zip, postcode);
+            var code = ConvertCustomerBarCode(zip, CheckPostCode(postCode));
             using (var img = CreateImage(code))
             {
                 img.Save(outputPath, ImageFormat.Gif);
@@ -88,14 +89,37 @@ namespace ZipConvertCustomerBarCode
         /// <summary>
         /// カスタマバーコードのイメージを返す
         /// </summary>
-        /// <param name="postcode">郵便番号</param>
+        /// <param name="postCode">郵便番号(ハイフンなし半角数字7桁)</param>
         /// <param name="zip">住所</param>
         /// <returns>バーコードイメージ</returns>
-        public static Bitmap CreateImage(string postcode, string zip)
+        public static Bitmap CreateImage(string postCode, string zip)
         {
-            var code = ConvertCustomerBarCode(zip, postcode);
+            var code = ConvertCustomerBarCode(zip, CheckPostCode(postCode));
             var img = CreateImage(code);
             return img;
+        }
+
+        /// <summary>
+        /// 郵便番号チェック
+        /// ハイフンを除いて数値7桁であること
+        /// </summary>
+        /// <param name="postCode">郵便番号</param>
+        /// <returns>郵便番号配列</returns>
+        private static IEnumerable<string> CheckPostCode(string postCode)
+        {
+            // 全角→半角
+            postCode = string.Join("", postCode.Select(n => (HankakuDic.ContainsKey(n) ? HankakuDic[n] : n)));
+
+            // ハイフン除去
+            postCode = postCode.Replace("-", "");
+
+            if (!Regex.IsMatch(postCode, @"\A\d{7}\Z"))
+            {
+                throw new ArgumentException("郵便番号は7桁の数値で入力してください。");
+            }
+
+            return postCode.Select(x => x.ToString());
+
         }
 
         /// <summary>
@@ -120,20 +144,18 @@ namespace ZipConvertCustomerBarCode
         /// <summary>
         /// カスタマバーコード変換
         /// </summary>
-        /// <param name="zip"></param>
-        /// <param name="postcode"></param>
+        /// <param name="zip">住所</param>
+        /// <param name="postCode">郵便番号</param>
         /// <returns></returns>
-        private static IEnumerable<string> ConvertCustomerBarCode(string zip, string postcode = null)
+        private static IEnumerable<string> ConvertCustomerBarCode(string zip, IEnumerable<string> postCode)
         {
             yield return startCode;
 
             // 全角→半角
             zip = string.Join("", zip.Select(n => (HankakuDic.ContainsKey(n) ? HankakuDic[n] : n)));
 
-            foreach (var z in postcode)
-            {
-                yield return z.ToString();
-            }
+            foreach (var pc in postCode) yield return pc;
+
             // http://www.post.japanpost.jp/zipcode/zipmanual/p19.html
             // 1. まず、データ内にあるアルファベットの小文字は大文字に置き換えます。
             zip = zip.ToUpper();
@@ -145,8 +167,7 @@ namespace ZipConvertCustomerBarCode
             // 3. 1および2で整理したデータから、算用数字、ハイフンおよび連続していないアルファベット1文字を必要な文字情報として抜き出します。
             // 4. 次に抜き出された文字の前にある下記の文字等は、ハイフン1文字に置き換えます。
             // 「漢字」、「かな文字」、「カタカナ文字」、「漢数字」、「ブランク」、「2文字以上連続したアルファベット文字」
-            var reg = new Regex("[^0-9A-Z\\-]|[A-Z]{2,}");
-            zip = reg.Replace(zip, "-");
+            zip = Regex.Replace(zip, "[^0-9A-Z\\-]|[A-Z]{2,}", "-");
 
             // ハイフン処理
             zip = TrimHyphen(zip);
@@ -154,7 +175,7 @@ namespace ZipConvertCustomerBarCode
             var customerCode = ConvertCCode(zip);
             foreach (var cd in customerCode) yield return cd;
 
-            yield return CalcCheckDigit(postcode, customerCode);
+            yield return CalcCheckDigit(postCode, customerCode);
 
             yield return endCode;
         }
@@ -167,8 +188,7 @@ namespace ZipConvertCustomerBarCode
         private static string TrimHyphen(string target)
         {
             // 5. 4の置き換えで、ハイフンが連続する場合は1つにまとめます。
-            var reg = new Regex("\\-{2,}");
-            target = reg.Replace(target, "-");
+            target = Regex.Replace(target, "\\-{2,}", "-");
 
             //アルファベット前後のハイフンを除去
             var tmp = target.ToCharArray();
@@ -218,13 +238,13 @@ namespace ZipConvertCustomerBarCode
         /// <summary>
         /// チェックデジット計算
         /// </summary>
-        /// <param name="postcode">郵便番号</param>
+        /// <param name="postCode">郵便番号</param>
         /// <param name="zipDisplayCode">住所表示番号</param>
         /// <returns>チェックデジット</returns>
-        private static string CalcCheckDigit(string postcode, string[] zipDisplayCode)
+        private static string CalcCheckDigit(IEnumerable<string> postCode, string[] zipDisplayCode)
         {
             // 郵便番号の各値と住所表示番号の各値の合計＋CD=19の倍数
-            var sum = postcode.Select(x => x.ToString()).Concat(zipDisplayCode)
+            var sum = postCode.Concat(zipDisplayCode)
                 .Select(x => CheckSumDic[x]).Sum();
 
             if (sum % 19 == 0) return "0";

@@ -8,12 +8,12 @@ namespace ZipConvertCustomerBarCode
 {
     /// <summary>
     /// 住所の照合
-    /// 空白、全角・半角、「ヶ」と「ケ」、漢数字と算用数字(六条 と 6条)の違いは区別しない
+    /// 空白、全角・半角、英字の大文字・小文字、「ヶ」と「ケ」、漢数字と算用数字(六条 と 6条)の違いは区別しない
     /// </summary>
     internal sealed class AddressMatcher
     {
-        // 漢数字
-        private const string KanjiNumerals = "〇一二三四五六七八九十百千";
+        // 漢数字(BarCode.KanjiToNumber で変換できるもの)
+        private static readonly string KanjiNumerals = BarCode.KanjiNumerals;
 
         // 階数(地下は除く)
         private static readonly Regex FloorRegex = new Regex(@"\G(?<floor>[0-9]+)(階|[Ff])");
@@ -179,7 +179,7 @@ namespace ZipConvertCustomerBarCode
         }
 
         /// <summary>
-        /// 照合用の文字の正規化
+        /// 照合用の文字の正規化(全角→半角、英字は大文字、「ヶ」→「ケ」)
         /// </summary>
         private static char NormalizeChar(char c)
         {
@@ -187,7 +187,7 @@ namespace ZipConvertCustomerBarCode
             {
                 case 'ヶ': return 'ケ';
                 case 'ヵ': return 'カ';
-                default: return BarCode.ToHankaku(c);
+                default: return char.ToUpperInvariant(BarCode.ToHankaku(c));
             }
         }
 

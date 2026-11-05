@@ -66,8 +66,11 @@ namespace ZipConvertCustomerBarCode
         // 漢数字(位取りなし)
         private static readonly string KanjiDigits = "〇一二三四五六七八九";
 
+        // 漢数字(位取りを含む)
+        internal static readonly string KanjiNumerals = KanjiDigits + "十百千";
+
         // 特定文字の前にある漢数字
-        private static readonly Regex KanjiNumberRegex = new Regex("[〇一二三四五六七八九十百千]+(?=丁目|丁|番地|番|号|地割|線|の|ノ)");
+        private static readonly Regex KanjiNumberRegex = new Regex("[" + KanjiNumerals + "]+(?=丁目|丁|番地|番|号|地割|線|の|ノ)");
 
         /// <summary>
         /// カスタマバーコードを生成する

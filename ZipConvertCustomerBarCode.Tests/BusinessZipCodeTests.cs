@@ -18,8 +18,8 @@ namespace ZipConvertCustomerBarCode.Tests
         [Fact]
         public void 事業所の個別郵便番号データを読み込める()
         {
-            // 町域28件 + 事業所7件(廃止の1件は除く)
-            Assert.Equal(35, Dictionary.Count);
+            // 町域31件 + 事業所7件(廃止の1件は除く)
+            Assert.Equal(38, Dictionary.Count);
             Assert.False(Dictionary.Contains("1008799"));
         }
 
@@ -32,7 +32,7 @@ namespace ZipConvertCustomerBarCode.Tests
 
             var dictionary = ZipCodeDictionary.Load(towns, businesses, Encoding.GetEncoding(932));
 
-            Assert.Equal(35, dictionary.Count);
+            Assert.Equal(38, dictionary.Count);
             Assert.True(businesses.CanRead);
         }
 
@@ -77,6 +77,31 @@ namespace ZipConvertCustomerBarCode.Tests
         }
 
         [Fact]
+        public void 事業所名の一部の一致は番地等まで一致する場合のみ()
+        {
+            // 「テスト」は「テスト工業宇都宮事業所」に含まれるが、番地等が一致しないため別の事業所とみなす
+            Assert.DoesNotContain(Dictionary.FindByAddress("栃木県宇都宮市清原工業団地99-9", "テスト"), x => x.IsIndividual);
+            Assert.DoesNotContain(Dictionary.FindByAddress("東京都千代田区大手町3-3-3", "テスト"), x => x.IsIndividual);
+
+            // 事業所名が一致する場合は、番地等が一致しなくても候補にする
+            Assert.Equal(new[] { "3213292", "3213294" },
+                Dictionary.FindByAddress("栃木県宇都宮市清原工業団地99-9", "テスト工業株式会社宇都宮事業所").Select(x => x.ZipCode).OrderBy(x => x));
+        }
+
+        [Fact]
+        public void 事業所名の英字の大文字小文字は区別しない()
+        {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            var csv = "13101,\"ｴﾇﾃｲｰﾃｲｰ\",\"ＮＴＴテスト　株式会社\",\"東京都\",\"千代田区\",\"大手町\",\"１丁目５－１\",\"1008116\",\"100  \",\"銀座\",0,0,0\r\n";
+            using var towns = File.OpenRead(TestCases.DataPath("ken_all_sample.csv"));
+            using var businesses = new MemoryStream(Encoding.GetEncoding(932).GetBytes(csv));
+            var dictionary = ZipCodeDictionary.Load(towns, businesses, Encoding.GetEncoding(932));
+
+            Assert.True(dictionary.TryGetZipCode("東京都千代田区大手町1-5-1", "ntt テスト", out var zipCode));
+            Assert.Equal("1008116", zipCode);
+        }
+
+        [Fact]
         public void 事業所が見つからなければ住所だけで探す()
         {
             Assert.True(Dictionary.TryGetZipCode("東京都千代田区霞が関1-3-2", "存在しない会社", out var zipCode));
@@ -117,6 +142,20 @@ namespace ZipConvertCustomerBarCode.Tests
 
             var e = Assert.Throws<InvalidDataException>(() => ZipCodeDictionary.Load(towns, businesses, Encoding.GetEncoding(932)));
             Assert.Contains("事業所の個別郵便番号データの1行目", e.Message);
+        }
+
+        [Fact]
+        public void 文字コードが違えば例外()
+        {
+            // UTF-8 に変換した JIGYOSYO.CSV を Shift_JIS として読み込む
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            var sjis = Encoding.GetEncoding(932);
+            var utf8 = Encoding.UTF8.GetBytes(sjis.GetString(File.ReadAllBytes(TestCases.DataPath("jigyosyo_sample.csv"))));
+            using var towns = File.OpenRead(TestCases.DataPath("ken_all_sample.csv"));
+            using var businesses = new MemoryStream(utf8);
+
+            var e = Assert.Throws<InvalidDataException>(() => ZipCodeDictionary.Load(towns, businesses, sjis));
+            Assert.Contains("都道府県名", e.Message);
         }
     }
 }

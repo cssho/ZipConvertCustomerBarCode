@@ -35,6 +35,9 @@ namespace ZipConvertCustomerBarCode
         // 郡名を含む市区町村名(「上川郡東神楽町」など。「大和郡山市」は対象外)
         private static readonly Regex DistrictRegex = new Regex("^.+?郡(?<name>.+[町村])$");
 
+        // 事業所名の照合で区別しない会社の種類
+        private static readonly string[] CompanyTypes = { "株式会社", "有限会社", "合同会社", "合資会社", "合名会社", "（株）", "(株)", "㈱", "（有）", "(有)", "㈲" };
+
         // 括弧書き: 超高層ビルの階(「１階」)
         private static readonly Regex FloorRegex = new Regex("^(?<floor>[0-9]+)階$");
 
@@ -276,7 +279,7 @@ namespace ZipConvertCustomerBarCode
         internal static string NormalizeBusinessName(string name)
         {
             var normalized = AddressMatcher.Normalize(name);
-            foreach (var word in new[] { "株式会社", "有限会社", "合同会社", "合資会社", "合名会社", "（株）", "(株)", "㈱", "（有）", "(有)", "㈲" })
+            foreach (var word in CompanyTypes)
             {
                 normalized = normalized.Replace(word, "");
             }

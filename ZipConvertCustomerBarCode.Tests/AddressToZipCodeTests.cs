@@ -35,7 +35,7 @@
         [InlineData("沖縄県島尻郡渡名喜村1917", "9013601")]
         [InlineData("茨城県猿島郡境町123", "3060433")]
         // 1つの郵便番号に複数の町域
-        [InlineData("テスト県テスト市本町北1-2", "9999901")]
+        [InlineData("北海道テスト市本町北1-2", "9999901")]
         // 町域名が一致しない場合は代表の郵便番号
         [InlineData("東京都千代田区存在しない町1-1", "1000000")]
         public void 住所から郵便番号を探せる(string address, string expected)
@@ -81,6 +81,29 @@
         {
             Assert.True(Dictionary.TryGetZipCode(address, out var zipCode));
             Assert.Equal(expected, zipCode);
+        }
+
+        [Theory]
+        // 英字の大文字・小文字、全角・半角は区別しない
+        [InlineData("東京都千代田区霞が関1-1-1　ABCタワー1階")]
+        [InlineData("東京都千代田区霞が関1-1-1　abcタワー1F")]
+        [InlineData("東京都千代田区霞が関1-1-1　ａｂｃタワー１ｆ")]
+        public void ビル名の英字の大文字小文字は区別しない(string address)
+        {
+            Assert.True(Dictionary.TryGetZipCode(address, out var zipCode));
+            Assert.Equal("1006101", zipCode);
+        }
+
+        [Fact]
+        public void 同名の市区町村は町域名がより長く一致した方()
+        {
+            // 「テスト村一円」(北海道)は町域名なしで一致、「本町」(青森県)は町域名まで一致
+            Assert.True(Dictionary.TryGetZipCode("テスト村本町1-2", out var zipCode));
+            Assert.Equal("9999912", zipCode);
+
+            // 町域名が一致しない場合は、町域名のない「テスト村一円」
+            Assert.True(Dictionary.TryGetZipCode("テスト村北町1-2", out zipCode));
+            Assert.Equal("9999911", zipCode);
         }
 
         [Theory]

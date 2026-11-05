@@ -12,7 +12,7 @@ namespace ZipConvertCustomerBarCode.Tests
         [Fact]
         public void CSVファイルを読み込める()
         {
-            Assert.Equal(28, Dictionary.Count);
+            Assert.Equal(31, Dictionary.Count);
         }
 
         [Fact]
@@ -26,7 +26,7 @@ namespace ZipConvertCustomerBarCode.Tests
                     archive.CreateEntryFromFile(TestCases.DataPath("ken_all_sample.csv"), "utf_ken_all.csv");
                 }
 
-                Assert.Equal(28, ZipCodeDictionary.Load(path).Count);
+                Assert.Equal(31, ZipCodeDictionary.Load(path).Count);
             }
             finally
             {
@@ -39,7 +39,7 @@ namespace ZipConvertCustomerBarCode.Tests
         {
             using var stream = File.OpenRead(TestCases.DataPath("ken_all_sample.csv"));
 
-            Assert.Equal(28, ZipCodeDictionary.Load(stream).Count);
+            Assert.Equal(31, ZipCodeDictionary.Load(stream).Count);
             // 渡された Stream は閉じない
             Assert.True(stream.CanRead);
         }
@@ -105,7 +105,7 @@ namespace ZipConvertCustomerBarCode.Tests
         // ヶ と ケ
         [InlineData("2730102", "千葉県鎌ヶ谷市右京塚　東3丁目-20-5", "千葉県鎌ヶ谷市右京塚", "　東3丁目-20-5")]
         // 全角・半角
-        [InlineData("9999902", "テスト県テスト市西2条3丁目", "テスト県テスト市西2条", "3丁目")]
+        [InlineData("9999902", "北海道テスト市西2条3丁目", "北海道テスト市西2条", "3丁目")]
         // 漢数字と算用数字
         [InlineData("0650006", "札幌市東区北6条東8丁目", "札幌市東区北6条東", "8丁目")]
         // 郡名の省略
@@ -123,7 +123,7 @@ namespace ZipConvertCustomerBarCode.Tests
         // 町域名が「一円」
         [InlineData("5220341", "滋賀県犬上郡多賀町一円12", "滋賀県犬上郡多賀町一円", "12")]
         // 1つの郵便番号に複数の町域がある場合は長く一致した方
-        [InlineData("9999901", "テスト県テスト市本町北1-2", "テスト県テスト市本町北", "1-2")]
+        [InlineData("9999901", "北海道テスト市本町北1-2", "北海道テスト市本町北", "1-2")]
         [InlineData("9999901", "テスト市本町1-2", "テスト市本町", "1-2")]
         public void 住所を町域名で分割できる(string zipCode, string address, string town, string block)
         {

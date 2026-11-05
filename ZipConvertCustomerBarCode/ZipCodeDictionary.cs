@@ -27,11 +27,23 @@ namespace ZipConvertCustomerBarCode
         // 町域名の前の「大字」「字」(郵便番号データの町域名には付いていない)
         private static readonly string[] TownPrefixes = { "大字", "字" };
 
+        // 都道府県名(文字コードが違うファイルを読み込んでいないかの確認に使う)
+        private static readonly HashSet<string> Prefectures = new HashSet<string>
+        {
+            "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
+            "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県",
+            "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県", "静岡県", "愛知県",
+            "三重県", "滋賀県", "京都府", "大阪府", "兵庫県", "奈良県", "和歌山県",
+            "鳥取県", "島根県", "岡山県", "広島県", "山口県",
+            "徳島県", "香川県", "愛媛県", "高知県",
+            "福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"
+        };
+
         // 郵便番号 → 町域・事業所
         private readonly Dictionary<string, ZipCodeEntry[]> entries;
 
-        // 市区町村(都道府県名・市区町村名が同じ町域)ごとの町域と、照合用に正規化した市区町村名までの住所の候補
-        private readonly (string Key, ZipCodeEntry[] Towns, string[] Candidates)[] cities;
+        // 市区町村
+        private readonly City[] cities;
 
         // 市区町村ごとの事業所
         private readonly Dictionary<string, ZipCodeEntry[]> businesses;
@@ -42,7 +54,7 @@ namespace ZipConvertCustomerBarCode
             var all = entries.Values.SelectMany(x => x).ToList();
             // 事業所だけがある市区町村も、事業所を探せるように含める
             cities = all.GroupBy(CityKey)
-                .Select(x => (x.Key, x.Where(e => !e.IsIndividual).ToArray(), x.First().GetCityCandidates().Select(AddressMatcher.Normalize).ToArray()))
+                .Select(x => new City(x.Key, x.Where(e => !e.IsIndividual).ToArray(), x.First().GetCityCandidates().Select(AddressMatcher.Normalize).ToArray()))
                 .ToArray();
             businesses = all.Where(x => x.IsIndividual)
                 .GroupBy(CityKey)
@@ -249,14 +261,13 @@ namespace ZipConvertCustomerBarCode
 
             var matcher = new AddressMatcher(address);
             var (matchedCities, cityEnd) = MatchCities(matcher);
+            var townStarts = TownStarts(matcher, cityEnd);
 
-            // 同名の市区町村が複数ある場合は、町域名まで一致した市区町村を優先する
-            var found = matchedCities.Select(x => FindTown(x.Towns, matcher, cityEnd)).ToList();
-            if (found.Any(x => x.TownMatched))
-            {
-                found = found.Where(x => x.TownMatched).ToList();
-            }
-            return found.SelectMany(x => x.Entries).ToList().AsReadOnly();
+            // 同名の市区町村が複数ある場合は、町域名がより長く一致した市区町村を優先する
+            // (町域名が一致しない市区町村は代表の郵便番号)
+            var found = matchedCities.Select(x => FindTown(x.Towns, matcher, cityEnd, townStarts)).ToList();
+            var townMatched = Longest(found, x => x.TownEnd, out _);
+            return (townMatched.Count > 0 ? townMatched : found).SelectMany(x => x.Entries).ToList().AsReadOnly();
         }
 
         /// <summary>
@@ -264,8 +275,9 @@ namespace ZipConvertCustomerBarCode
         /// </summary>
         /// <remarks>
         /// 住所の市区町村にある事業所(大口事業所・私書箱の個別郵便番号)から、事業所名が一致するものを探す。
-        /// 事業所名の空白、全角・半角、「株式会社」「（株）」などの違いは区別せず、一致しない場合は一方が他方を含むものを探す。
+        /// 事業所名の空白、全角・半角、英字の大文字・小文字、「株式会社」「（株）」などの違いは区別しない。
         /// 同じ事業所名が複数ある場合は、番地等まで一致する事業所、なければ町域名まで一致する事業所を優先する。
+        /// 事業所名が一致しない場合は、一方が他方を含む事業所のうち、住所が番地等まで一致するものを探す(支店名の省略など)。
         /// 事業所が見つからない場合は、住所だけで探す(<see cref="FindByAddress(string)"/>)。
         /// 事業所の個別郵便番号データを読み込んでいない場合も、住所だけで探す。
         /// </remarks>
@@ -282,33 +294,44 @@ namespace ZipConvertCustomerBarCode
             {
                 var matcher = new AddressMatcher(address);
                 var (matchedCities, cityEnd) = MatchCities(matcher);
+                var townStarts = TownStarts(matcher, cityEnd);
                 var candidates = matchedCities
                     .SelectMany(x => businesses.TryGetValue(x.Key, out var list) ? list : Enumerable.Empty<ZipCodeEntry>())
                     .ToList();
 
-                // 事業所名が一致する事業所、なければ一方が他方を含む事業所
-                var hits = candidates.Where(x => x.NormalizedBusinessName == name).ToList();
-                if (hits.Count == 0)
-                {
-                    hits = candidates.Where(x => x.NormalizedBusinessName.Length > 0
-                        && (x.NormalizedBusinessName.Contains(name) || name.Contains(x.NormalizedBusinessName))).ToList();
-                }
+                // 事業所名が一致する事業所
+                var exact = candidates.Where(x => x.NormalizedBusinessName == name).ToList();
+                if (exact.Count > 0) return SelectBusinesses(exact, matcher, cityEnd, townStarts, false).AsReadOnly();
 
-                if (hits.Count > 0)
-                {
-                    // 同じ事業所名が複数ある場合は、番地等まで一致する事業所、なければ町域名まで一致する事業所を優先する
-                    var townHits = hits.Select(x => (Entry: x, End: MatchTownName(x, matcher, cityEnd))).Where(x => x.End >= 0).ToList();
-                    // 番地等が最も長く一致した事業所(「１丁目７－２」より「１丁目７－２（銀座郵便局私書箱第４３３号）」)
-                    var blockHits = townHits.Select(x => (x.Entry, End: matcher.MatchPrefix(x.Entry.Block, x.End))).Where(x => x.End >= 0).ToList();
-                    if (blockHits.Count > 0)
-                    {
-                        var longest = blockHits.Max(x => x.End);
-                        return blockHits.Where(x => x.End == longest).Select(x => x.Entry).ToList().AsReadOnly();
-                    }
-                    return (townHits.Count > 0 ? townHits.Select(x => x.Entry).ToList() : hits).AsReadOnly();
-                }
+                // 一方が他方を含む事業所(「田中」と「田中貴金属工業」のような別の事業所を除くため、住所が番地等まで一致するもののみ)
+                var partial = candidates.Where(x => x.NormalizedBusinessName.Length > 0
+                    && (x.NormalizedBusinessName.Contains(name) || name.Contains(x.NormalizedBusinessName))).ToList();
+                var selected = SelectBusinesses(partial, matcher, cityEnd, townStarts, true);
+                if (selected.Count > 0) return selected.AsReadOnly();
             }
             return FindByAddress(address);
+        }
+
+        /// <summary>
+        /// 事業所名が一致した事業所を、住所の町域名・番地等で絞り込む
+        /// </summary>
+        /// <param name="hits">事業所名が一致した事業所</param>
+        /// <param name="matcher">住所</param>
+        /// <param name="cityEnd">住所の市区町村名の終わりの位置</param>
+        /// <param name="townStarts">町域名の照合を始める位置</param>
+        /// <param name="requireBlock">番地等まで一致する事業所のみを返すかどうか</param>
+        /// <returns>候補の事業所</returns>
+        private static List<ZipCodeEntry> SelectBusinesses(List<ZipCodeEntry> hits, AddressMatcher matcher, int cityEnd, int[] townStarts, bool requireBlock)
+        {
+            var townHits = hits.Select(x => (Entry: x, End: MatchTownName(x, matcher, cityEnd, townStarts))).Where(x => x.End >= 0).ToList();
+
+            // 番地等が最も長く一致した事業所(「１丁目７－２」より「１丁目７－２（銀座郵便局私書箱第４３３号）」)
+            var blockHits = Longest(townHits.Where(x => x.Entry.Block.Length > 0), x => matcher.MatchPrefix(x.Entry.Block, x.End), out _);
+            if (blockHits.Count > 0) return blockHits.Select(x => x.Entry).ToList();
+            if (requireBlock) return new List<ZipCodeEntry>();
+
+            // 番地等が一致しなければ町域名まで一致する事業所、それもなければ事業所名が一致したすべて
+            return townHits.Count > 0 ? townHits.Select(x => x.Entry).ToList() : hits;
         }
 
         /// <summary>
@@ -349,11 +372,9 @@ namespace ZipConvertCustomerBarCode
         /// </summary>
         /// <param name="matcher">住所</param>
         /// <returns>市区町村と、住所の市区町村名の終わりの位置</returns>
-        private (List<(string Key, ZipCodeEntry[] Towns, string[] Candidates)> Cities, int End) MatchCities(AddressMatcher matcher)
+        private (List<City> Cities, int End) MatchCities(AddressMatcher matcher)
         {
-            var bestEnd = -1;
-            var matched = new List<(string Key, ZipCodeEntry[] Towns, string[] Candidates)>();
-            foreach (var city in cities)
+            var matched = Longest(cities, city =>
             {
                 // 市区町村の数(約1,900)だけ繰り返すため、LINQ は使わない
                 var end = -1;
@@ -361,15 +382,43 @@ namespace ZipConvertCustomerBarCode
                 {
                     end = Math.Max(end, matcher.MatchNormalizedPrefix(candidate, 0));
                 }
-                if (end < 0 || end < bestEnd) continue;
-                if (end > bestEnd)
-                {
-                    bestEnd = end;
-                    matched.Clear();
-                }
-                matched.Add(city);
-            }
+                return end;
+            }, out var bestEnd);
             return (matched, bestEnd);
+        }
+
+        /// <summary>
+        /// 町域名(地区名)の照合を始める位置(後ろに「大字」「字」がある場合はその後ろも)
+        /// </summary>
+        /// <param name="matcher">住所</param>
+        /// <param name="position">位置</param>
+        /// <returns>照合を始める位置</returns>
+        private static int[] TownStarts(AddressMatcher matcher, int position)
+        {
+            var starts = new List<int> { position };
+            foreach (var prefix in TownPrefixes)
+            {
+                var start = matcher.MatchNormalizedPrefix(prefix, position);
+                if (start >= 0) starts.Add(start);
+            }
+            return starts.ToArray();
+        }
+
+        /// <summary>
+        /// 照合を始める位置のいずれかから正規化済みの文字列が一致する場合、一致した部分の終わりの位置を返す
+        /// </summary>
+        /// <param name="matcher">住所</param>
+        /// <param name="target">正規化済みの町域名・地区名</param>
+        /// <param name="starts">照合を始める位置</param>
+        /// <returns>一致した部分の終わりの位置。一致しない場合は -1</returns>
+        private static int MatchFrom(AddressMatcher matcher, string target, int[] starts)
+        {
+            var end = -1;
+            foreach (var start in starts)
+            {
+                end = Math.Max(end, matcher.MatchNormalizedPrefix(target, start));
+            }
+            return end;
         }
 
         /// <summary>
@@ -378,19 +427,12 @@ namespace ZipConvertCustomerBarCode
         /// <param name="entry">町域・事業所</param>
         /// <param name="matcher">住所</param>
         /// <param name="cityEnd">住所の市区町村名の終わりの位置</param>
+        /// <param name="townStarts">町域名の照合を始める位置</param>
         /// <returns>一致した部分の終わりの位置。一致しない場合は -1</returns>
-        private static int MatchTownName(ZipCodeEntry entry, AddressMatcher matcher, int cityEnd)
+        private static int MatchTownName(ZipCodeEntry entry, AddressMatcher matcher, int cityEnd, int[] townStarts)
         {
             var town = entry.NormalizedTownName;
-            if (town.Length == 0) return cityEnd;
-
-            var end = matcher.MatchNormalizedPrefix(town, cityEnd);
-            foreach (var prefix in TownPrefixes)
-            {
-                var start = matcher.MatchNormalizedPrefix(prefix, cityEnd);
-                if (start >= 0) end = Math.Max(end, matcher.MatchNormalizedPrefix(town, start));
-            }
-            return end;
+            return town.Length == 0 ? cityEnd : MatchFrom(matcher, town, townStarts);
         }
 
         /// <summary>
@@ -399,30 +441,42 @@ namespace ZipConvertCustomerBarCode
         /// <param name="city">市区町村の町域</param>
         /// <param name="matcher">住所</param>
         /// <param name="cityEnd">住所の市区町村名の終わりの位置</param>
-        /// <returns>候補の町域と、町域名(または「○○町一円」など)が一致したかどうか</returns>
-        private static (IEnumerable<ZipCodeEntry> Entries, bool TownMatched) FindTown(ZipCodeEntry[] city, AddressMatcher matcher, int cityEnd)
+        /// <param name="townStarts">町域名の照合を始める位置</param>
+        /// <returns>候補の町域と、住所の町域名の終わりの位置(町域名が一致せず代表の郵便番号の場合は -1)</returns>
+        private static (IEnumerable<ZipCodeEntry> Entries, int TownEnd) FindTown(ZipCodeEntry[] city, AddressMatcher matcher, int cityEnd, int[] townStarts)
         {
             // 町域名が最も長く一致した町域
-            var bestTownEnd = -1;
-            var matched = new List<ZipCodeEntry>();
-            foreach (var entry in city)
-            {
-                if (entry.IsRepresentative) continue;
-
-                var end = MatchTownName(entry, matcher, cityEnd);
-                if (end < 0 || end < bestTownEnd) continue;
-                if (end > bestTownEnd)
-                {
-                    bestTownEnd = end;
-                    matched.Clear();
-                }
-                matched.Add(entry);
-            }
+            var matched = Longest(city.Where(x => !x.IsRepresentative), x => MatchTownName(x, matcher, cityEnd, townStarts), out var townEnd);
 
             // 町域名が一致しない場合は代表の郵便番号
-            if (matched.Count == 0) return (city.Where(x => x.IsRepresentative), false);
+            if (matched.Count == 0) return (city.Where(x => x.IsRepresentative), -1);
 
-            return (SelectInTown(matched, matcher, bestTownEnd), true);
+            return (SelectInTown(matched, matcher, townEnd), townEnd);
+        }
+
+        /// <summary>
+        /// 一致した部分の終わりの位置が最も大きいもの(同じ位置のものはすべて)を返す
+        /// </summary>
+        /// <param name="items">候補</param>
+        /// <param name="getEnd">一致した部分の終わりの位置(一致しない場合は負)</param>
+        /// <param name="bestEnd">最も大きい終わりの位置(一致するものがない場合は -1)</param>
+        /// <returns>最も長く一致したもの</returns>
+        private static List<T> Longest<T>(IEnumerable<T> items, Func<T, int> getEnd, out int bestEnd)
+        {
+            bestEnd = -1;
+            var result = new List<T>();
+            foreach (var item in items)
+            {
+                var end = getEnd(item);
+                if (end < 0 || end < bestEnd) continue;
+                if (end > bestEnd)
+                {
+                    bestEnd = end;
+                    result.Clear();
+                }
+                result.Add(item);
+            }
+            return result;
         }
 
         /// <summary>
@@ -465,20 +519,8 @@ namespace ZipConvertCustomerBarCode
             var areas = matched.Where(x => x.NormalizedArea != null).ToList();
             if (areas.Count > 0)
             {
-                var starts = new[] { townEnd, matcher.MatchNormalizedPrefix("大字", townEnd), matcher.MatchNormalizedPrefix("字", townEnd) };
-                var bestAreaEnd = -1;
-                var areaMatched = new List<ZipCodeEntry>();
-                foreach (var entry in areas)
-                {
-                    var end = starts.Where(x => x >= 0).Max(x => matcher.MatchNormalizedPrefix(entry.NormalizedArea, x));
-                    if (end < 0 || end < bestAreaEnd) continue;
-                    if (end > bestAreaEnd)
-                    {
-                        bestAreaEnd = end;
-                        areaMatched.Clear();
-                    }
-                    areaMatched.Add(entry);
-                }
+                var areaStarts = TownStarts(matcher, townEnd);
+                var areaMatched = Longest(areas, x => MatchFrom(matcher, x.NormalizedArea, areaStarts), out var bestAreaEnd);
                 if (areaMatched.Count > 0) return SelectByBlockNumber(areaMatched, matcher.LeadingNumber(bestAreaEnd));
 
                 // 地区名が書かれていない場合は、地区名のない町域の範囲・「その他」で選ぶ
@@ -546,6 +588,28 @@ namespace ZipConvertCustomerBarCode
         private static string CityKey(ZipCodeEntry entry) => entry.Prefecture + "\t" + entry.City;
 
         /// <summary>
+        /// 市区町村(都道府県名・市区町村名が同じ町域)
+        /// </summary>
+        private sealed class City
+        {
+            public City(string key, ZipCodeEntry[] towns, string[] candidates)
+            {
+                Key = key;
+                Towns = towns;
+                Candidates = candidates;
+            }
+
+            /// <summary>都道府県名と市区町村名</summary>
+            public string Key { get; }
+
+            /// <summary>町域(事業所は含まない)</summary>
+            public ZipCodeEntry[] Towns { get; }
+
+            /// <summary>照合用に正規化した、市区町村名までの住所の候補</summary>
+            public string[] Candidates { get; }
+        }
+
+        /// <summary>
         /// CSVファイル(zip ファイルの場合は中の最初のCSVファイル)を開く
         /// </summary>
         private static T OpenCsv<T>(string path, Func<Stream, T> read)
@@ -610,7 +674,8 @@ namespace ZipConvertCustomerBarCode
 
                     var zipCode = CheckZipCode(Unquote(fields[2]), name, lineNumber, expected);
                     // 7:都道府県名 8:市区町村名 9:町域名(漢字) 12:丁目を有する町域
-                    Add(new ZipCodeEntry(zipCode, Share(Unquote(fields[6])), Share(Unquote(fields[7])), Unquote(fields[8]), fields[11] == "1"));
+                    var prefecture = CheckPrefecture(Unquote(fields[6]), name, lineNumber, expected);
+                    Add(new ZipCodeEntry(zipCode, prefecture, Share(Unquote(fields[7])), Unquote(fields[8]), fields[11] == "1"));
                 });
             }
 
@@ -638,7 +703,9 @@ namespace ZipConvertCustomerBarCode
                         default: throw InvalidFormat(name, lineNumber, "個別番号の種別が0か1ではありません", expected);
                     }
                     // 3:大口事業所名(漢字) 4:都道府県名 5:市区町村名 6:町域名 7:小字名、丁目、番地等
-                    Add(new ZipCodeEntry(zipCode, Share(Unquote(fields[3])), Share(Unquote(fields[4])), Unquote(fields[5]), Unquote(fields[6]), Unquote(fields[2]), kind));
+                    // 文字コードが違う(UTF-8 に変換したファイルなど)と、置換文字にならずに別の文字に化けるため、都道府県名で確認する
+                    var prefecture = CheckPrefecture(Unquote(fields[3]), name, lineNumber, expected);
+                    Add(new ZipCodeEntry(zipCode, prefecture, Share(Unquote(fields[4])), Unquote(fields[5]), Unquote(fields[6]), Unquote(fields[2]), kind));
                 });
             }
 
@@ -683,6 +750,15 @@ namespace ZipConvertCustomerBarCode
                         read(line.Split(','), lineNumber, line);
                     }
                 }
+            }
+
+            private string CheckPrefecture(string prefecture, string name, int lineNumber, string expected)
+            {
+                if (!Prefectures.Contains(prefecture))
+                {
+                    throw InvalidFormat(name, lineNumber, "都道府県名が正しくありません。文字コードが違う可能性があります", expected);
+                }
+                return Share(prefecture);
             }
 
             private static string CheckZipCode(string zipCode, string name, int lineNumber, string expected)

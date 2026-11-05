@@ -43,6 +43,28 @@ namespace ZipConvertCustomerBarCode.Tests
             }
         }
 
+        [Theory]
+        [InlineData(GraphicsUnit.Pixel)]
+        [InlineData(GraphicsUnit.Inch)]
+        public void 実寸で描画できる(GraphicsUnit pageUnit)
+        {
+            var code = BarCode.Create("1000013", "東京都千代田区霞が関", "1丁目3番2号　郵便プラザ503室");
+            using var img = new Bitmap(1000, 80);
+            // 254dpi = 10ピクセル/mm
+            img.SetResolution(254, 254);
+            using (var gr = Graphics.FromImage(img))
+            {
+                gr.Clear(Color.White);
+                gr.PageUnit = pageUnit;
+                code.Draw(gr, 1, 1);
+
+                // 描画後は元の単位に戻る
+                Assert.Equal(pageUnit, gr.PageUnit);
+            }
+
+            PrintAssert.Bars(code, (x, y) => img.GetPixel(x, y).ToArgb() == Color.Black.ToArgb(), 10, 1);
+        }
+
         private static void AssertSamePixels(Bitmap expected, Bitmap actual)
         {
             Assert.Equal(expected.Width, actual.Width);

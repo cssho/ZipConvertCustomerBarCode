@@ -54,5 +54,42 @@ namespace ZipConvertCustomerBarCode.Drawing
                 img.Save(outputPath, format);
             }
         }
+
+        /// <summary>
+        /// 印刷用の実寸(mm)でカスタマバーコードを描画する
+        /// 宛名印刷(PrintDocument など)で、用紙の指定位置に描画するときに使う
+        /// </summary>
+        /// <remarks>
+        /// バーのみを黒で描画する(背景は描画しない)。
+        /// マニュアルでは上下左右に2mm以上の空白が必要。
+        /// </remarks>
+        /// <param name="code">カスタマバーコード</param>
+        /// <param name="graphics">描画先</param>
+        /// <param name="x">最初のバーの左端のX座標(mm)</param>
+        /// <param name="y">バーの上端のY座標(mm)</param>
+        /// <param name="point">大きさ(8～11.5ポイント)</param>
+        public static void Draw(this CustomerBarCode code, Graphics graphics, float x, float y, double point = 10)
+        {
+            if (code == null) throw new ArgumentNullException(nameof(code));
+            if (graphics == null) throw new ArgumentNullException(nameof(graphics));
+
+            var bars = code.GetPrintBars(point);
+            var pageUnit = graphics.PageUnit;
+            var pageScale = graphics.PageScale;
+            try
+            {
+                graphics.PageUnit = GraphicsUnit.Millimeter;
+                graphics.PageScale = 1;
+                foreach (var bar in bars)
+                {
+                    graphics.FillRectangle(Brushes.Black, x + (float)bar.X, y + (float)bar.Y, (float)bar.Width, (float)bar.Height);
+                }
+            }
+            finally
+            {
+                graphics.PageUnit = pageUnit;
+                graphics.PageScale = pageScale;
+            }
+        }
     }
 }

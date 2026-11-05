@@ -66,5 +66,44 @@ namespace ZipConvertCustomerBarCode.Skia
         {
             File.WriteAllBytes(outputPath, code.ToPng(scale));
         }
+
+        /// <summary>
+        /// PDF(SKDocument.CreatePdf)のキャンバスで1mmあたりの単位数(1単位 = 1/72インチ)
+        /// </summary>
+        public const float PdfUnitsPerMillimeter = 72f / 25.4f;
+
+        /// <summary>
+        /// 印刷用の実寸(mm)でカスタマバーコードを描画する
+        /// PDF などに、用紙の指定位置に描画するときに使う
+        /// </summary>
+        /// <remarks>
+        /// バーのみを黒で描画する(背景は描画しない)。
+        /// マニュアルでは上下左右に2mm以上の空白が必要。
+        /// </remarks>
+        /// <param name="code">カスタマバーコード</param>
+        /// <param name="canvas">描画先</param>
+        /// <param name="x">最初のバーの左端のX座標(mm)</param>
+        /// <param name="y">バーの上端のY座標(mm)</param>
+        /// <param name="unitsPerMillimeter">キャンバスの1mmあたりの単位数(PDF は <see cref="PdfUnitsPerMillimeter"/>)</param>
+        /// <param name="point">大きさ(8～11.5ポイント)</param>
+        public static void Draw(this CustomerBarCode code, SKCanvas canvas, float x, float y, float unitsPerMillimeter, double point = 10)
+        {
+            if (code == null) throw new ArgumentNullException(nameof(code));
+            if (canvas == null) throw new ArgumentNullException(nameof(canvas));
+            if (!(unitsPerMillimeter > 0)) throw new ArgumentOutOfRangeException(nameof(unitsPerMillimeter), "1mmあたりの単位数は0より大きい値で指定してください。");
+
+            var bars = code.GetPrintBars(point);
+            using (var paint = new SKPaint { Color = SKColors.Black, IsAntialias = false })
+            {
+                foreach (var bar in bars)
+                {
+                    canvas.DrawRect(SKRect.Create(
+                        (x + (float)bar.X) * unitsPerMillimeter,
+                        (y + (float)bar.Y) * unitsPerMillimeter,
+                        (float)bar.Width * unitsPerMillimeter,
+                        (float)bar.Height * unitsPerMillimeter), paint);
+                }
+            }
+        }
     }
 }

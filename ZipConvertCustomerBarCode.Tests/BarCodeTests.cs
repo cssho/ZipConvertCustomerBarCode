@@ -93,6 +93,41 @@ namespace ZipConvertCustomerBarCode.Tests
             Assert.Throws<ArgumentNullException>(() => BarCode.Create("0140113", null!));
         }
 
+        [Theory]
+        [InlineData("100-0013", "1000013")]
+        [InlineData("１００－００１３", "1000013")]
+        public void 郵便番号は半角数字7桁で取得できる(string zipCode, string expected)
+        {
+            var code = BarCode.Create(zipCode, "1-3-2");
+
+            Assert.Equal(expected, code.ZipCode);
+        }
+
+        [Theory]
+        [InlineData("東京都千代田区霞が関", "1丁目3番2号　郵便プラザ503室", "1-3-2-503")]
+        [InlineData("千葉県鎌ヶ谷市右京塚", "東3丁目-20-5　郵便・A&bコーポB604号", "3-20-5B604")]
+        // 13けたを超えても切り捨てない
+        [InlineData("札幌市中央区南四条西", "29丁目1524-23　第2郵便ハウス501", "29-1524-23-2-501")]
+        [InlineData("とある町", "", "")]
+        public void 住所表示番号を取得できる(string townAddress, string blockAddress, string expected)
+        {
+            var code = BarCode.Create("1234567", townAddress, blockAddress);
+
+            Assert.Equal(expected, code.AddressNumber);
+        }
+
+        [Theory]
+        [InlineData("5250000", true)]
+        [InlineData("3510100", true)]
+        [InlineData("1000013", false)]
+        [InlineData("1000010", false)]
+        public void 代表の郵便番号を判定できる(string zipCode, bool expected)
+        {
+            var code = BarCode.Create(zipCode, "1-1");
+
+            Assert.Equal(expected, code.IsRepresentativeZipCode);
+        }
+
         [Fact]
         public void 常に23シンボルで開始コードと終了コードで挟まれる()
         {

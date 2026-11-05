@@ -87,8 +87,16 @@ namespace ZipConvertCustomerBarCode
             if (zipCode == null) throw new ArgumentNullException(nameof(zipCode));
             if (address == null) throw new ArgumentNullException(nameof(address));
 
-            var code = ConvertCustomerBarCode(address, CheckPostCode(zipCode));
-            return new CustomerBarCode(code);
+            var zip = CheckPostCode(zipCode);
+            var addressNumber = ExtractAddressNumber(address);
+            var customerCode = ConvertCCode(addressNumber);
+
+            // スタートコード + 郵便番号 + 住所表示番号 + チェックデジット + ストップコード
+            var symbols = new[] { startCode }
+                .Concat(zip.Select(x => x.ToString()))
+                .Concat(customerCode)
+                .Concat(new[] { CalcCheckDigit(zip.Select(x => x.ToString()), customerCode), endCode });
+            return new CustomerBarCode(zip, addressNumber, symbols);
         }
 
         /// <summary>
@@ -122,8 +130,8 @@ namespace ZipConvertCustomerBarCode
         /// ハイフンを除いて数値7桁であること
         /// </summary>
         /// <param name="zipCode">郵便番号</param>
-        /// <returns>郵便番号配列</returns>
-        private static IEnumerable<string> CheckPostCode(string zipCode)
+        /// <returns>郵便番号(半角数字7桁)</returns>
+        private static string CheckPostCode(string zipCode)
         {
             // 全角→半角
             zipCode = string.Join("", zipCode.Select(n => (HankakuDic.ContainsKey(n) ? HankakuDic[n] : n)));
@@ -137,24 +145,18 @@ namespace ZipConvertCustomerBarCode
                 throw new ArgumentException("郵便番号は7桁の数値で入力してください。");
             }
 
-            return zipCode.Select(x => x.ToString());
-
+            return zipCode;
         }
 
         /// <summary>
-        /// カスタマバーコード変換
+        /// 住所表示番号の抜き出し
         /// </summary>
         /// <param name="address">住所</param>
-        /// <param name="zipCode">郵便番号</param>
-        /// <returns></returns>
-        private static IEnumerable<string> ConvertCustomerBarCode(string address, IEnumerable<string> zipCode)
+        /// <returns>住所表示番号(13けたで切り捨てる前)</returns>
+        private static string ExtractAddressNumber(string address)
         {
-            yield return startCode;
-
             // 全角→半角
             address = string.Join("", address.Select(n => (HankakuDic.ContainsKey(n) ? HankakuDic[n] : n)));
-
-            foreach (var pc in zipCode) yield return pc;
 
             // http://www.post.japanpost.jp/zipcode/zipmanual/p19.html
             // 1. まず、データ内にあるアルファベットの小文字は大文字に置き換えます。
@@ -181,14 +183,7 @@ namespace ZipConvertCustomerBarCode
             address = Regex.Replace(address, "[^0-9A-Z\\-]|[A-Z]{2,}", "-");
 
             // ハイフン処理
-            address = TrimHyphen(address);
-
-            var customerCode = ConvertCCode(address);
-            foreach (var cd in customerCode) yield return cd;
-
-            yield return CalcCheckDigit(zipCode, customerCode);
-
-            yield return endCode;
+            return TrimHyphen(address);
         }
 
         /// <summary>

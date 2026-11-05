@@ -187,7 +187,11 @@ namespace ZipConvertCustomerBarCode
             {
                 case 'ヶ': return 'ケ';
                 case 'ヵ': return 'カ';
-                default: return char.ToUpperInvariant(BarCode.ToHankaku(c));
+                default:
+                    // 全角英字は ToHankaku で半角になるため、大文字にするのは半角の a～z のみ
+                    // (char.ToUpperInvariant は住所の分割で1件あたり約1μs遅くなるため使わない)
+                    var hankaku = BarCode.ToHankaku(c);
+                    return hankaku >= 'a' && hankaku <= 'z' ? (char)(hankaku - 'a' + 'A') : hankaku;
             }
         }
 

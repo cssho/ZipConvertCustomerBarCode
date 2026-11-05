@@ -1,0 +1,11 @@
+# GitHub Actions のアクションの更新
+# ワークフローは actions.lock でロックしているが、Dependabot は更新の PR でロックファイルも作り直す
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # 出たばかりのリリースは、問題(乗っ取りなど)が見つかる前に取り込まないよう7日待つ(既定は3日)
+    cooldown:
+      default-days: 7

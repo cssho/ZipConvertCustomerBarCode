@@ -1,0 +1,29 @@
+# .github/workflows/actions.lock がワークフローと食い違っている場合や、
+# ロックしたコミットが上流で確認できなくなった場合に失敗する
+# (github/gh-actions-lock の verify-lockfile.yml をもとに、週1回の定期実行を追加している)
+
+name: verify-lockfile
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  # PR や push がない期間も、ロックしたタグが上流で付け替えられていないかを確認する
+  schedule:
+    - cron: '0 0 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - run: gh extension install github/gh-actions-lock --pin v0.4.1
+      - run: gh actions-lock --verify

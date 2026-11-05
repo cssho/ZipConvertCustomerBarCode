@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <!-- net8.0 では Span<T> などを使う(#if NET8_0_OR_GREATER) -->
+    <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
     <Description>郵便番号・住所から日本郵便のカスタマバーコードを生成する(描画ライブラリ非依存)</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>

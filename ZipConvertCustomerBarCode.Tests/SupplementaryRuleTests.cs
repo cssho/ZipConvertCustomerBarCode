@@ -97,7 +97,7 @@ namespace ZipConvertCustomerBarCode.Tests
         public void 住所Aと住所Bがnullなら例外()
         {
             Assert.Throws<ArgumentNullException>(() => BarCode.Create("1020082", null!, "5-3"));
-            Assert.Throws<ArgumentNullException>(() => BarCode.Create("1020082", "東京都千代田区一番町", null!));
+            Assert.Throws<ArgumentNullException>(() => BarCode.Create("1020082", "東京都千代田区一番町", (string)null!));
         }
 
         // 住所表示番号のシンボルをバーコード・データの文字列に戻す(CC4 の埋め草は除く)

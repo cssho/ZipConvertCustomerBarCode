@@ -13,8 +13,21 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!--
+    コアは netstandard2.0 と net8.0 で処理が異なる(#if NET8_0_OR_GREATER)ため、両方をテストする。
+    通常は net8.0 版、dotnet test -p:CoreTargetFramework=netstandard2.0 で netstandard2.0 版を使う。
+  -->
+  <PropertyGroup>
+    <CoreTargetFramework Condition="'$(CoreTargetFramework)' == ''">net8.0</CoreTargetFramework>
+  </PropertyGroup>
+
   <ItemGroup>
-    <ProjectReference Include="..\ZipConvertCustomerBarCode\ZipConvertCustomerBarCode.csproj" />
+    <!-- テストで、使っているコアのビルドを確認する -->
+    <AssemblyMetadata Include="CoreTargetFramework" Value="$(CoreTargetFramework)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ZipConvertCustomerBarCode\ZipConvertCustomerBarCode.csproj" SetTargetFramework="TargetFramework=$(CoreTargetFramework)" />
     <ProjectReference Include="..\ZipConvertCustomerBarCode.Drawing\ZipConvertCustomerBarCode.Drawing.csproj" />
     <ProjectReference Include="..\ZipConvertCustomerBarCode.SkiaSharp\ZipConvertCustomerBarCode.SkiaSharp.csproj" />
   </ItemGroup>

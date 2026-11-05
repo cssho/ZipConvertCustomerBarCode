@@ -229,11 +229,18 @@ namespace ZipConvertCustomerBarCode
             blockAddress = null;
 
             // 最も長く一致した町域名で分割する
+            // (候補の文字列をつなげて作らないよう、都道府県名・市区町村名・町域名の順に照合する)
             var matcher = new AddressMatcher(address);
-            var end = list.SelectMany(x => x.GetTownAddressCandidates())
-                .Select(x => matcher.MatchPrefix(x))
-                .DefaultIfEmpty(-1)
-                .Max();
+            var end = -1;
+            foreach (var entry in list)
+            {
+                // 「以下に掲載がない場合」は町域名がわからないため分割しない
+                if (entry.IsRepresentative) continue;
+
+                var cityEnd = MatchCityName(entry, matcher);
+                if (cityEnd < 0) continue;
+                end = Math.Max(end, MatchTownName(entry, matcher, cityEnd, TownStarts(matcher, cityEnd)));
+            }
             if (end < 0) return false;
 
             townAddress = address.Substring(0, end).Trim();
@@ -385,6 +392,24 @@ namespace ZipConvertCustomerBarCode
                 return end;
             }, out var bestEnd);
             return (matched, bestEnd);
+        }
+
+        /// <summary>
+        /// 住所の先頭が市区町村名まで(都道府県名ありとなし、郡名ありとなし)と一致する場合、一致した部分の終わりの位置を返す
+        /// </summary>
+        /// <param name="entry">町域・事業所</param>
+        /// <param name="matcher">住所</param>
+        /// <returns>一致した部分の終わりの位置。一致しない場合は -1</returns>
+        private static int MatchCityName(ZipCodeEntry entry, AddressMatcher matcher)
+        {
+            var prefectureEnd = matcher.MatchPrefix(entry.Prefecture, 0);
+            var end = -1;
+            foreach (var start in prefectureEnd >= 0 ? new[] { 0, prefectureEnd } : new[] { 0 })
+            {
+                end = Math.Max(end, matcher.MatchPrefix(entry.City, start));
+                if (entry.CityWithoutDistrict != null) end = Math.Max(end, matcher.MatchPrefix(entry.CityWithoutDistrict, start));
+            }
+            return end;
         }
 
         /// <summary>
@@ -668,14 +693,14 @@ namespace ZipConvertCustomerBarCode
                 const string expected = "UTF-8形式の utf_ken_all.csv";
                 ReadLines(stream, new UTF8Encoding(false), (fields, lineNumber, line) =>
                 {
-                    if (fields.Length != TownColumnCount) throw InvalidFormat(name, lineNumber, "列数が15ではありません", expected);
+                    if (fields.Count != TownColumnCount) throw InvalidFormat(name, lineNumber, "列数が15ではありません", expected);
                     // Shift_JIS のファイルを UTF-8 として読むと置換文字になる
                     if (line.IndexOf((char)0xFFFD) >= 0) throw InvalidFormat(name, lineNumber, "UTF-8 として読めない文字があります", expected);
 
-                    var zipCode = CheckZipCode(Unquote(fields[2]), name, lineNumber, expected);
+                    var zipCode = CheckZipCode(fields.Get(2), name, lineNumber, expected);
                     // 7:都道府県名 8:市区町村名 9:町域名(漢字) 12:丁目を有する町域
-                    var prefecture = CheckPrefecture(Unquote(fields[6]), name, lineNumber, expected);
-                    Add(new ZipCodeEntry(zipCode, prefecture, Share(Unquote(fields[7])), Unquote(fields[8]), fields[11] == "1"));
+                    var prefecture = CheckPrefecture(fields.Get(6), name, lineNumber, expected);
+                    Add(new ZipCodeEntry(zipCode, prefecture, Share(fields.Get(7)), fields.Get(8), fields.Is(11, "1")));
                 });
             }
 
@@ -688,24 +713,22 @@ namespace ZipConvertCustomerBarCode
                 const string expected = "JIGYOSYO.CSV";
                 ReadLines(stream, encoding, (fields, lineNumber, line) =>
                 {
-                    if (fields.Length != BusinessColumnCount) throw InvalidFormat(name, lineNumber, "列数が13ではありません", expected);
+                    if (fields.Count != BusinessColumnCount) throw InvalidFormat(name, lineNumber, "列数が13ではありません", expected);
 
                     // 13:修正コード(5は廃止)
-                    if (fields[12] == "5") return;
+                    if (fields.Is(12, "5")) return;
 
-                    var zipCode = CheckZipCode(Unquote(fields[7]), name, lineNumber, expected);
+                    var zipCode = CheckZipCode(fields.Get(7), name, lineNumber, expected);
                     // 11:個別番号の種別(0:大口事業所 1:私書箱)
                     ZipCodeKind kind;
-                    switch (fields[10])
-                    {
-                        case "0": kind = ZipCodeKind.Business; break;
-                        case "1": kind = ZipCodeKind.PostOfficeBox; break;
-                        default: throw InvalidFormat(name, lineNumber, "個別番号の種別が0か1ではありません", expected);
-                    }
+                    if (fields.Is(10, "0")) kind = ZipCodeKind.Business;
+                    else if (fields.Is(10, "1")) kind = ZipCodeKind.PostOfficeBox;
+                    else throw InvalidFormat(name, lineNumber, "個別番号の種別が0か1ではありません", expected);
+
                     // 3:大口事業所名(漢字) 4:都道府県名 5:市区町村名 6:町域名 7:小字名、丁目、番地等
                     // 文字コードが違う(UTF-8 に変換したファイルなど)と、置換文字にならずに別の文字に化けるため、都道府県名で確認する
-                    var prefecture = CheckPrefecture(Unquote(fields[3]), name, lineNumber, expected);
-                    Add(new ZipCodeEntry(zipCode, prefecture, Share(Unquote(fields[4])), Unquote(fields[5]), Unquote(fields[6]), Unquote(fields[2]), kind));
+                    var prefecture = CheckPrefecture(fields.Get(3), name, lineNumber, expected);
+                    Add(new ZipCodeEntry(zipCode, prefecture, Share(fields.Get(4)), fields.Get(5), fields.Get(6), fields.Get(2), kind));
                 });
             }
 
@@ -737,8 +760,12 @@ namespace ZipConvertCustomerBarCode
             /// <summary>
             /// CSVを1行ずつ読み込む(各項目は","区切りで、文字列項目は「"」で囲まれている。項目内に","はない)
             /// </summary>
-            private static void ReadLines(Stream stream, Encoding encoding, Action<string[], int, string> read)
+            private static void ReadLines(Stream stream, Encoding encoding, Action<CsvFields, int, string> read)
             {
+#if NET8_0_OR_GREATER
+                // 区切り位置は行ごとに使い回す(列数が多すぎる場合を検出できるよう、最大の列数 + 1)
+                var ranges = new Range[Math.Max(TownColumnCount, BusinessColumnCount) + 1];
+#endif
                 using (var reader = new StreamReader(stream, encoding, false, 4096, true))
                 {
                     string line;
@@ -747,7 +774,11 @@ namespace ZipConvertCustomerBarCode
                     {
                         lineNumber++;
                         if (line.Length == 0) continue;
-                        read(line.Split(','), lineNumber, line);
+#if NET8_0_OR_GREATER
+                        read(new CsvFields(line, ranges), lineNumber, line);
+#else
+                        read(new CsvFields(line), lineNumber, line);
+#endif
                     }
                 }
             }
@@ -771,20 +802,66 @@ namespace ZipConvertCustomerBarCode
             }
 
             /// <summary>
-            /// 「"」で囲まれた項目から「"」を除く
-            /// </summary>
-            private static string Unquote(string field)
-            {
-                return field.Length >= 2 && field[0] == '"' && field[field.Length - 1] == '"' ? field.Substring(1, field.Length - 2) : field;
-            }
-
-            /// <summary>
             /// 形式エラー
             /// </summary>
             private static InvalidDataException InvalidFormat(string name, int lineNumber, string reason, string expected)
             {
                 return new InvalidDataException($"{name}の{lineNumber}行目の形式が正しくありません({reason})。{expected} を指定してください。");
             }
+        }
+
+        /// <summary>
+        /// CSVの1行の項目(各項目は","区切りで、文字列項目は「"」で囲まれている。項目内に","はない)
+        /// </summary>
+        private readonly struct CsvFields
+        {
+#if NET8_0_OR_GREATER
+            // 使う項目だけを文字列にするため、行は区切り位置だけを求めておく
+            private readonly string line;
+            private readonly Range[] ranges;
+
+            public CsvFields(string line, Range[] ranges)
+            {
+                this.line = line;
+                this.ranges = ranges;
+                Count = line.AsSpan().Split(ranges, ',');
+            }
+
+            /// <summary>項目数(最大の列数を超える場合は最大の列数 + 1)</summary>
+            public int Count { get; }
+
+            /// <summary>項目(「"」は除く)</summary>
+            public string Get(int index) => Unquote(line.AsSpan()[ranges[index]]).ToString();
+
+            /// <summary>項目(「"」は除く)が指定した値かどうか</summary>
+            public bool Is(int index, string value) => Unquote(line.AsSpan()[ranges[index]]).SequenceEqual(value);
+
+            private static ReadOnlySpan<char> Unquote(ReadOnlySpan<char> field)
+            {
+                return field.Length >= 2 && field[0] == '"' && field[field.Length - 1] == '"' ? field.Slice(1, field.Length - 2) : field;
+            }
+#else
+            private readonly string[] fields;
+
+            public CsvFields(string line)
+            {
+                fields = line.Split(',');
+            }
+
+            /// <summary>項目数</summary>
+            public int Count => fields.Length;
+
+            /// <summary>項目(「"」は除く)</summary>
+            public string Get(int index) => Unquote(fields[index]);
+
+            /// <summary>項目(「"」は除く)が指定した値かどうか</summary>
+            public bool Is(int index, string value) => Get(index) == value;
+
+            private static string Unquote(string field)
+            {
+                return field.Length >= 2 && field[0] == '"' && field[field.Length - 1] == '"' ? field.Substring(1, field.Length - 2) : field;
+            }
+#endif
         }
     }
 }

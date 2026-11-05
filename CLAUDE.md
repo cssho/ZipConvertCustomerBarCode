@@ -6,24 +6,31 @@
 
 - 日本向けのライブラリなので、ユーザーとのやり取り・ドキュメント（README、CLAUDE.md など）・コードコメント・XML ドキュメントコメント・コミットメッセージはすべて日本語で書く。
 
-## ビルド
+## 構成・ビルド
 
-- プロジェクトは旧形式（非 SDK スタイル）の csproj で、ターゲットは .NET Framework 4.0（`LibExecuter` は 4.0 Client Profile）。`dotnet build` ではビルドできないため、Visual Studio の MSBuild を使う:
-  `"/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe" ZipConvertCustomerBarCode.sln -nologo -v:m`
-- 現在この環境では .NET Framework 4.0 の参照アセンブリ（Developer Pack）がないため、MSB3644 でビルドが失敗する。その場合はエラーを報告し、ユーザーの指示なしに `TargetFrameworkVersion` を変更しない。
-- コードは .NET Framework 4.0 の API の範囲で書く（`IReadOnlyList` や `Task.Run` などは使えない）。
+- ライブラリは 3 つ、すべて `netstandard2.0`（SDK スタイル）。ビルドは `dotnet build ZipConvertCustomerBarCode.sln`。
+  - `ZipConvertCustomerBarCode`: コア。外部依存を追加しない（描画ライブラリに依存させないのが分割の目的）。
+  - `ZipConvertCustomerBarCode.Drawing`: System.Drawing.Common による描画（Windows のみ）。
+  - `ZipConvertCustomerBarCode.SkiaSharp`: SkiaSharp による描画。名前空間は `SkiaSharp` との衝突を避けるため `ZipConvertCustomerBarCode.Skia`。
+- `netstandard2.0` の既定 C# は 7.3。`record` や null 許容参照型など新しい構文は使わない。
+- バージョン・著作権表示は `Directory.Build.props` にまとめている。
+- 公開メンバーには XML ドキュメントコメントを付ける（`GenerateDocumentationFile` 有効のため、ないと警告になる）。
 
 ## テスト
 
-- テストプロジェクトはない。`LibExecuter` はサンプル住所で `BarCode.CreateImage` を呼ぶだけのコンソールアプリで、結果は手動で確認する。
+- `dotnet test` で実行（xUnit v3、net10.0）。`global.json` で Microsoft.Testing.Platform を指定しているため、`Microsoft.NET.Test.Sdk` や `xunit.runner.visualstudio` は追加しない。
+- `TestData/cases.tsv` と `v1-*.png` は 1.x（.NET Framework 版）の出力で、シンボル列と画像がこれとピクセル単位で一致することを確認している。出力が変わる修正をした場合は、意図した変更か確認してから期待値を更新する。
+- `cases.tsv` はタブ区切り（郵便番号・住所・シンボル列・画像ファイル名）。住所が空の行があるので、シェルで加工するときは連続するタブがまとめられないよう注意する。
+- System.Drawing のテストは Windows 以外ではスキップされる。
 
 ## コード規約
 
-- `.cs` ファイルは UTF-8（BOM 付き）・CRLF 改行。どちらも維持する。
+- `.cs` ファイルは UTF-8（BOM 付き）・CRLF 改行。どちらも維持する（新規ファイルにも BOM を付ける）。
 
-## バーコード処理（`ZipConvertCustomerBarCode/BarCode.cs`）
+## バーコード処理
 
-- 住所の変換は日本郵便のバーコードマニュアル（http://www.post.japanpost.jp/zipcode/zipmanual/p19.html）に従う。コード中の番号付きコメント（1.〜6.）はマニュアルの手順番号に対応している。
-- バーコードは常に 23 シンボル: スタート + 郵便番号 7 桁 + 住所表示番号 13 枠（不足分は `CC4` で埋める）+ チェックデジット + ストップ。各シンボルは幅 12px の GIF なので画像サイズは 276×12。シンボル数を変える場合は `new Bitmap(276, 12)` も合わせて変更する。
-- シンボル画像は `ZipConvertCustomerBarCode/Resources/*.gif`。`ImageKeyDic` が各シンボルをリソース名（`Num0`、`Hyphen`、`CC1`、`Start`、`End` など）に対応付けている。リソース名はファイル名ではなく `Properties/Resources.resx` と `Resources.Designer.cs` で定義されているため、画像を追加するときは両方を更新する。
+- 住所の変換（`BarCode.cs`）は日本郵便のバーコードマニュアル（http://www.post.japanpost.jp/zipcode/zipmanual/p19.html）に従う。コード中の番号付きコメント（1.〜6.）はマニュアルの手順番号に対応している。
+- バーコードは常に 23 シンボル: スタート + 郵便番号 7 桁 + 住所表示番号 13 枠（不足分は `CC4` で埋める）+ チェックデジット + ストップ。
+- バーの形は `CustomerBarCode.cs` の `BarPatternDic` で定義（1 シンボル = 幅 12px に 3 本、x=0/4/8、幅 2px、上・中・下段 各 4px）。この表は旧バージョンの GIF 画像とピクセル単位で一致することを確認済みなので、変更するときは既存出力と比較する。
+- 描画パッケージは `GetBars()` の矩形を白地に黒で塗るだけにし、バーコードのロジックはコアに置く。
 - 住所中の漢数字には未対応（README に記載の既知の制限）。

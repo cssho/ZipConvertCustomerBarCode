@@ -23,10 +23,21 @@ SkiaSharp を Linux で使う場合は、利用側で `SkiaSharp.NativeAssets.Li
 ```csharp
 using ZipConvertCustomerBarCode;
 
-// 郵便番号,住所
-CustomerBarCode code = BarCode.Create("0140113", "秋田県大仙市堀見内　南田茂木　添60-1");
+// 郵便番号, 住所A(町域名までの住所), 住所B(町域名以降の住所)
+CustomerBarCode code = BarCode.Create("1000013", "東京都千代田区霞が関", "1丁目3番2号　郵便プラザ503室");
 ```
 郵便番号が7桁の数値でない場合は `ArgumentException` になります。
+
+住所表示番号は、[郵便番号・バーコードマニュアル](https://www.post.japanpost.jp/zipcode/zipmanual/p19.html)の抜き出しルール（補足ルールを含む）に従って住所Bから抜き出します。
+「丁目・番地・号」などの前の漢数字は算用数字に変換し（例：十一丁目 → 11）、「2F」のような階数の F は抜き出しません。
+
+住所を分けずに渡すこともできます。
+
+```csharp
+CustomerBarCode code = BarCode.Create("1000013", "東京都千代田区霞が関1丁目3番2号　郵便プラザ503室");
+```
+
+ただしこの場合は住所全体を住所Bとして扱うため、町域名に「丁目・番・ノ」などの前の漢数字を含む住所（一番町、八丁堀、三ノ輪 など）では、町域名の漢数字も抜き出されて誤ったバーコードになります。住所A・住所Bに分けて渡すことをおすすめします。
 
 ### SVG（依存ライブラリなし）
 ```csharp
@@ -69,5 +80,4 @@ foreach (var bar in code.GetBars())
 | `BarCode.Export(zip, address, path)` | `BarCode.Create(zip, address).Save(path, ImageFormat.Gif)`（Drawing） |
 
 ## 備考
-* 漢数字未対応
 * 住所→郵便番号変換辞書検討中（郵便番号の入力が不要に）

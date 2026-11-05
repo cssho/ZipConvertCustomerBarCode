@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 
@@ -62,9 +63,21 @@ namespace ZipConvertCustomerBarCode
         // アルファベット
         private static readonly string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
+        // 漢数字(位取りなし)
+        private static readonly string KanjiDigits = "〇一二三四五六七八九";
+
+        // 特定文字の前にある漢数字
+        private static readonly Regex KanjiNumberRegex = new Regex("[〇一二三四五六七八九十百千]+(?=丁目|丁|番地|番|号|地割|線|の|ノ)");
+
         /// <summary>
         /// カスタマバーコードを生成する
+        /// 住所Aと住所Bに分けて渡すオーバーロードの使用を推奨
         /// </summary>
+        /// <remarks>
+        /// 住所全体を町域名以降の住所(住所B)として扱う。
+        /// 町域名に「特定文字(丁目、番、ノ など)の前の漢数字」を含む住所(一番町、八丁堀、三ノ輪 など)では、
+        /// 町域名の漢数字も住所表示番号として抜き出されるため、誤ったバーコードになる。
+        /// </remarks>
         /// <param name="zipCode">郵便番号(半角・全角数字7桁、ハイフンは可)</param>
         /// <param name="address">住所</param>
         /// <returns>カスタマバーコード</returns>
@@ -76,6 +89,32 @@ namespace ZipConvertCustomerBarCode
 
             var code = ConvertCustomerBarCode(address, CheckPostCode(zipCode));
             return new CustomerBarCode(code);
+        }
+
+        /// <summary>
+        /// カスタマバーコードを生成する
+        /// </summary>
+        /// <remarks>
+        /// 住所表示番号は住所Bからのみ抜き出す。
+        /// 住所Bが住所Aで始まる場合(住所全体が渡された場合)は、住所Aの部分を取り除いてから抜き出す。
+        /// http://www.post.japanpost.jp/zipcode/zipmanual/p17.html
+        /// </remarks>
+        /// <param name="zipCode">郵便番号(半角・全角数字7桁、ハイフンは可)</param>
+        /// <param name="townAddress">住所A: 町域名までの住所(例: 東京都千代田区霞が関)</param>
+        /// <param name="blockAddress">住所B: 町域名以降の住所(例: 1丁目3番2号 郵便プラザ503室)</param>
+        /// <returns>カスタマバーコード</returns>
+        /// <exception cref="ArgumentException">郵便番号が7桁の数値でない場合</exception>
+        public static CustomerBarCode Create(string zipCode, string townAddress, string blockAddress)
+        {
+            if (townAddress == null) throw new ArgumentNullException(nameof(townAddress));
+            if (blockAddress == null) throw new ArgumentNullException(nameof(blockAddress));
+
+            var town = townAddress.Trim();
+            if (town.Length > 0 && blockAddress.StartsWith(town, StringComparison.Ordinal))
+            {
+                blockAddress = blockAddress.Substring(town.Length);
+            }
+            return Create(zipCode, blockAddress);
         }
 
         /// <summary>
@@ -126,6 +165,16 @@ namespace ZipConvertCustomerBarCode
             //「&」(アンパサンド)、「/」(スラッシュ)、「・」(中グロ)、「.」(ピリオド)
             address = string.Join("", address.Split('&', '＆', '/', '／', '･', '・', '.', '．'));
 
+            // 補足ルール
+            // 1. 漢数字が下記の特定文字の前にある場合は抜き出し対象とし、算用数字に変換して抜き出します。
+            // "丁目" "丁" "番地" "番" "号" "地割" "線" "の" "ノ"
+            address = KanjiNumberRegex.Replace(address, m => KanjiToNumber(m.Value));
+
+            // 2. 連続していないアルファベット1文字は抜き出し対象となりますが、算用数字に続くアルファベット1文字"F"に限っては抜き出し対象としません。
+            // 3. "F"以降のデータに抜き出し対象となる文字がある場合、"F"はハイフン1文字に置き換えます。
+            // (抜き出し対象外の文字として、4の処理でハイフンに置き換わる)
+            address = Regex.Replace(address, "(?<=[0-9])F(?![A-Z])", "-");
+
             // 3. 1および2で整理したデータから、算用数字、ハイフンおよび連続していないアルファベット1文字を必要な文字情報として抜き出します。
             // 4. 次に抜き出された文字の前にある下記の文字等は、ハイフン1文字に置き換えます。
             // 「漢字」、「かな文字」、「カタカナ文字」、「漢数字」、「ブランク」、「2文字以上連続したアルファベット文字」
@@ -143,8 +192,41 @@ namespace ZipConvertCustomerBarCode
         }
 
         /// <summary>
+        /// 漢数字を算用数字に変換する
+        /// 「十一」のような位取りありと、「二〇五」のような位取りなしの両方に対応
+        /// </summary>
+        /// <param name="kanji">漢数字</param>
+        /// <returns>算用数字</returns>
+        private static string KanjiToNumber(string kanji)
+        {
+            if (kanji.IndexOfAny(new[] { '十', '百', '千' }) < 0)
+            {
+                return string.Concat(kanji.Select(c => KanjiDigits.IndexOf(c)));
+            }
+
+            int total = 0, current = 0;
+            foreach (var c in kanji)
+            {
+                var digit = KanjiDigits.IndexOf(c);
+                if (digit >= 0)
+                {
+                    current = digit;
+                    continue;
+                }
+                var unit = c == '十' ? 10 : c == '百' ? 100 : 1000;
+                total += (current == 0 ? 1 : current) * unit;
+                current = 0;
+            }
+            return (total + current).ToString(CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
         /// ハイフン処理
         /// </summary>
+        /// <remarks>
+        /// 補足ルール5: アルファベット前後のハイフンを取り除いた結果、
+        /// 2文字以上の連続したアルファベット文字が残った場合はそのままにする(例: 6-7-L-B106 → 6-7LB106)
+        /// </remarks>
         /// <param name="target">処理対象文字列</param>
         /// <returns>処理後文字列</returns>
         private static string TrimHyphen(string target)
@@ -152,7 +234,7 @@ namespace ZipConvertCustomerBarCode
             // 5. 4の置き換えで、ハイフンが連続する場合は1つにまとめます。
             target = Regex.Replace(target, "\\-{2,}", "-");
 
-            //アルファベット前後のハイフンを除去
+            // 補足ルール4: アルファベット前後のハイフンを除去
             var tmp = target.ToCharArray();
             for (int i = 0; i < target.Length; i++)
             {

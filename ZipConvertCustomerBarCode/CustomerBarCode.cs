@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 using System.Text;
@@ -31,9 +32,10 @@ namespace ZipConvertCustomerBarCode
             {"STC"," LD"},{"SPC","DL "}
         };
 
-        internal CustomerBarCode(IReadOnlyList<string> symbols)
+        internal CustomerBarCode(IEnumerable<string> symbols)
         {
-            Symbols = symbols;
+            // 呼び出し側から書き換えられないよう、コピーを読み取り専用で保持する
+            Symbols = new ReadOnlyCollection<string>(symbols.ToArray());
         }
 
         /// <summary>

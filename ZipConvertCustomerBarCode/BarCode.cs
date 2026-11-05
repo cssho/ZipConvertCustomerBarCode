@@ -32,7 +32,7 @@ namespace ZipConvertCustomerBarCode
             {'ｐ','p'},{'ｑ','q'},{'ｒ','r'},{'ｓ','s'},{'ｔ','t'},
             {'ｕ','u'},{'ｖ','v'},{'ｗ','w'},{'ｘ','x'},{'ｙ','y'},
             {'ｚ','z'},
-            {'　',' '},{'‐','-'}
+            {'　',' '},{'‐','-'},{'－','-'}
         };
 
         // 文字→バーコード辞書
@@ -75,7 +75,7 @@ namespace ZipConvertCustomerBarCode
             if (address == null) throw new ArgumentNullException(nameof(address));
 
             var code = ConvertCustomerBarCode(address, CheckPostCode(zipCode));
-            return new CustomerBarCode(code.ToArray());
+            return new CustomerBarCode(code);
         }
 
         /// <summary>
@@ -92,7 +92,8 @@ namespace ZipConvertCustomerBarCode
             // ハイフン除去
             zipCode = zipCode.Replace("-", "");
 
-            if (!Regex.IsMatch(zipCode, @"\A\d{7}\Z"))
+            // \d は全角以外の Unicode 数字にも、\Z は末尾の改行にもマッチするため使わない
+            if (!Regex.IsMatch(zipCode, @"\A[0-9]{7}\z"))
             {
                 throw new ArgumentException("郵便番号は7桁の数値で入力してください。");
             }
@@ -118,7 +119,8 @@ namespace ZipConvertCustomerBarCode
 
             // http://www.post.japanpost.jp/zipcode/zipmanual/p19.html
             // 1. まず、データ内にあるアルファベットの小文字は大文字に置き換えます。
-            address = address.ToUpper();
+            // 実行環境のカルチャによらず変換する(tr-TR では i が İ になるため)
+            address = address.ToUpperInvariant();
 
             // 2. 同様に、データ内にある"&"等の下記の文字は取り除き、後ろのデータを詰めます。
             //「&」(アンパサンド)、「/」(スラッシュ)、「・」(中グロ)、「.」(ピリオド)
@@ -173,26 +175,15 @@ namespace ZipConvertCustomerBarCode
         /// <returns>カスタマバーコード</returns>
         private static string[] ConvertCCode(string address)
         {
-            int idx = 0;
-            var customerCode = Enumerable.Repeat("CC4", 13).ToArray();
-            foreach (var c in address.Select(x => x.ToString()).Take(13))
-            {
-                var cc = BarcodeCharDic[c];
-                if (cc.Length == 1)
-                {
-                    // 数値、ハイフン
-                    customerCode[idx] = cc[0];
-                }
-                else
-                {
-                    // アルファベット
-                    customerCode[idx] = cc[0];
-                    customerCode[idx + 1] = cc[1];
-                    idx++;
-                }
-                idx++;
-            }
-            return customerCode;
+            // 数値、ハイフンは1けた、アルファベットは英字用制御コードと数字の2けたに変換し、
+            // 13けたに満たない場合は CC4 で埋める
+            // http://www.post.japanpost.jp/zipcode/zipmanual/p20.html
+            // 合計けた数が20けた(住所表示番号は13けた)を超えた場合、以降の文字については切り捨てます。
+            // その際、20～21けた目がアルファベット文字となった場合、20けた目の英字用制御(CC1、CC2、CC3)は残して以降は切り捨てます。
+            return address.SelectMany(c => BarcodeCharDic[c.ToString()])
+                .Concat(Enumerable.Repeat("CC4", 13))
+                .Take(13)
+                .ToArray();
         }
 
         /// <summary>

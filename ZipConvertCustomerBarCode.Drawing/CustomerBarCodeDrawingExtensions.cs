@@ -20,15 +20,24 @@ namespace ZipConvertCustomerBarCode.Drawing
             if (code == null) throw new ArgumentNullException(nameof(code));
 
             var img = new Bitmap(code.GetWidth(scale), code.GetHeight(scale));
-            using (var gr = Graphics.FromImage(img))
+            try
             {
-                gr.Clear(Color.White);
-                foreach (var bar in code.GetBars(scale))
+                using (var gr = Graphics.FromImage(img))
                 {
-                    gr.FillRectangle(Brushes.Black, bar.X, bar.Y, bar.Width, bar.Height);
+                    gr.Clear(Color.White);
+                    foreach (var bar in code.GetBars(scale))
+                    {
+                        gr.FillRectangle(Brushes.Black, bar.X, bar.Y, bar.Width, bar.Height);
+                    }
                 }
+                return img;
             }
-            return img;
+            catch
+            {
+                // 描画に失敗した場合は生成済みのイメージを破棄する
+                img.Dispose();
+                throw;
+            }
         }
 
         /// <summary>

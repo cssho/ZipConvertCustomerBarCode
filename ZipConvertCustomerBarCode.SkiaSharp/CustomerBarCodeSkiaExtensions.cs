@@ -20,16 +20,25 @@ namespace ZipConvertCustomerBarCode.Skia
             if (code == null) throw new ArgumentNullException(nameof(code));
 
             var img = new SKBitmap(code.GetWidth(scale), code.GetHeight(scale));
-            using (var canvas = new SKCanvas(img))
-            using (var paint = new SKPaint { Color = SKColors.Black, IsAntialias = false })
+            try
             {
-                canvas.Clear(SKColors.White);
-                foreach (var bar in code.GetBars(scale))
+                using (var canvas = new SKCanvas(img))
+                using (var paint = new SKPaint { Color = SKColors.Black, IsAntialias = false })
                 {
-                    canvas.DrawRect(SKRect.Create(bar.X, bar.Y, bar.Width, bar.Height), paint);
+                    canvas.Clear(SKColors.White);
+                    foreach (var bar in code.GetBars(scale))
+                    {
+                        canvas.DrawRect(SKRect.Create(bar.X, bar.Y, bar.Width, bar.Height), paint);
+                    }
                 }
+                return img;
             }
-            return img;
+            catch
+            {
+                // 描画に失敗した場合は生成済みのイメージを破棄する
+                img.Dispose();
+                throw;
+            }
         }
 
         /// <summary>

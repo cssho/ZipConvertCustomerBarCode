@@ -44,6 +44,49 @@ namespace ZipConvertCustomerBarCode.Tests
             }
         }
 
+        [Fact]
+        public void 実寸で描画できる()
+        {
+            var code = BarCode.Create("1000013", "東京都千代田区霞が関", "1丁目3番2号　郵便プラザ503室");
+            using var img = new SKBitmap(1000, 80);
+            using (var canvas = new SKCanvas(img))
+            {
+                canvas.Clear(SKColors.White);
+                // 10ピクセル/mm
+                code.Draw(canvas, 1, 1, 10);
+            }
+
+            PrintAssert.Bars(code, (x, y) => img.GetPixel(x, y) == SKColors.Black, 10, 1);
+        }
+
+        [Fact]
+        public void PDFに描画できる()
+        {
+            var code = BarCode.Create("1000013", "東京都千代田区霞が関", "1丁目3番2号　郵便プラザ503室");
+            using var stream = new MemoryStream();
+            using (var document = SKDocument.CreatePdf(stream))
+            {
+                // A4
+                var canvas = document.BeginPage(210 * CustomerBarCodeSkiaExtensions.PdfUnitsPerMillimeter, 297 * CustomerBarCodeSkiaExtensions.PdfUnitsPerMillimeter);
+                code.Draw(canvas, 20, 20, CustomerBarCodeSkiaExtensions.PdfUnitsPerMillimeter);
+                document.EndPage();
+            }
+
+            Assert.True(stream.Length > 0);
+            Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(stream.ToArray(), 0, 4));
+        }
+
+        [Fact]
+        public void 単位数が0以下なら例外()
+        {
+            var code = BarCode.Create("1000013", "1-3-2");
+            using var img = new SKBitmap(10, 10);
+            using var canvas = new SKCanvas(img);
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => code.Draw(canvas, 0, 0, 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => code.Draw(canvas, 0, 0, float.NaN));
+        }
+
         private static void AssertSamePixels(SKBitmap expected, SKBitmap actual)
         {
             Assert.Equal(expected.Width, actual.Width);

@@ -21,6 +21,11 @@ namespace ZipConvertCustomerBarCode
         private const int BarWidth = 2;
         private const int BarPitch = 4;
 
+        // 印刷時の大きさ(ポイント)。マニュアルでは8～11.5ポイント相当を許す
+        private const double DefaultPoint = 10;
+        private const double MinPoint = 8;
+        private const double MaxPoint = 11.5;
+
         // シンボル→バー配置辞書
         // L:ロングバー、A:セミロングバー(上)、D:セミロングバー(下)、T:タイミングバー、空白:バーなし
         private static readonly Dictionary<string, string> BarPatternDic = new Dictionary<string, string>()
@@ -32,11 +37,34 @@ namespace ZipConvertCustomerBarCode
             {"STC"," LD"},{"SPC","DL "}
         };
 
-        internal CustomerBarCode(IEnumerable<string> symbols)
+        internal CustomerBarCode(string zipCode, string addressNumber, IEnumerable<string> symbols)
         {
+            ZipCode = zipCode;
+            AddressNumber = addressNumber;
             // 呼び出し側から書き換えられないよう、コピーを読み取り専用で保持する
             Symbols = new ReadOnlyCollection<string>(symbols.ToArray());
         }
+
+        /// <summary>
+        /// 郵便番号(半角数字7桁、ハイフンなし)
+        /// </summary>
+        public string ZipCode { get; }
+
+        /// <summary>
+        /// 住所から抜き出した住所表示番号(マニュアルの「バーコード・データ」、例: 3-20-5B604)
+        /// 13けたで切り捨てる前の値で、バーコードに含まれるのは先頭13けた分
+        /// </summary>
+        public string AddressNumber { get; }
+
+        /// <summary>
+        /// 代表の郵便番号かどうか(下2けたが"00")
+        /// </summary>
+        /// <remarks>
+        /// 代表の郵便番号(郵便番号簿の「以下に掲載がない場合」の番号)の郵便物には、カスタマバーコードを付けない。
+        /// マニュアルでは代表の郵便番号は「原則として」下2けたが"00"とされているため、下2けたで判定している。
+        /// http://www.post.japanpost.jp/zipcode/zipmanual/p18.html
+        /// </remarks>
+        public bool IsRepresentativeZipCode => ZipCode.EndsWith("00", StringComparison.Ordinal);
 
         /// <summary>
         /// シンボル列
@@ -101,6 +129,89 @@ namespace ZipConvertCustomerBarCode
             sb.Append("</svg>");
             return sb.ToString();
         }
+
+        /// <summary>
+        /// 印刷時のバーコードの幅(mm、余白を含まない)
+        /// </summary>
+        /// <param name="point">大きさ(8～11.5ポイント)</param>
+        public double GetPrintWidth(double point = DefaultPoint)
+        {
+            var bars = GetBars().ToList();
+            var width = bars[bars.Count - 1].X + BarWidth - bars[0].X;
+            return width * MillimetersPerPixel(point);
+        }
+
+        /// <summary>
+        /// 印刷時のバーコードの高さ(mm、余白を含まない)
+        /// </summary>
+        /// <param name="point">大きさ(8～11.5ポイント)</param>
+        public double GetPrintHeight(double point = DefaultPoint)
+        {
+            return CellHeight * MillimetersPerPixel(point);
+        }
+
+        /// <summary>
+        /// 印刷時のバーの配置を返す(mm単位、左上の基準は最初のバーの左上)
+        /// </summary>
+        /// <remarks>
+        /// 寸法は郵便番号・バーコードマニュアルに従う(10ポイントのときバー幅0.6mm、バーピッチ1.2mm、ロングバー3.6mm)。
+        /// http://www.post.japanpost.jp/zipcode/zipmanual/p12.html
+        /// </remarks>
+        /// <param name="point">大きさ(8～11.5ポイント)</param>
+        /// <returns>バー配置</returns>
+        public IEnumerable<PrintBar> GetPrintBars(double point = DefaultPoint)
+        {
+            var mm = MillimetersPerPixel(point);
+            var bars = GetBars().ToList();
+            var offset = bars[0].X;
+            return bars.Select(bar => new PrintBar(bar.Type, (bar.X - offset) * mm, bar.Y * mm, bar.Width * mm, bar.Height * mm));
+        }
+
+        /// <summary>
+        /// 印刷用のSVG形式の文字列を返す(サイズはmm単位)
+        /// </summary>
+        /// <param name="point">大きさ(8～11.5ポイント)</param>
+        /// <param name="margin">上下左右の余白(mm)。マニュアルでは2mm以上の空白が必要</param>
+        /// <returns>SVG</returns>
+        public string ToPrintSvg(double point = DefaultPoint, double margin = 2)
+        {
+            if (double.IsNaN(margin) || margin < 0) throw new ArgumentOutOfRangeException(nameof(margin), "余白は0以上で指定してください。");
+
+            var width = GetPrintWidth(point) + margin * 2;
+            var height = GetPrintHeight(point) + margin * 2;
+            var sb = new StringBuilder();
+            sb.AppendFormat(CultureInfo.InvariantCulture,
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{0}mm\" height=\"{1}mm\" viewBox=\"0 0 {0} {1}\">",
+                Round(width), Round(height));
+            sb.Append("<rect width=\"100%\" height=\"100%\" fill=\"#fff\"/>");
+            foreach (var bar in GetPrintBars(point))
+            {
+                sb.AppendFormat(CultureInfo.InvariantCulture,
+                    "<rect x=\"{0}\" y=\"{1}\" width=\"{2}\" height=\"{3}\"/>",
+                    Round(bar.X + margin), Round(bar.Y + margin), Round(bar.Width), Round(bar.Height));
+            }
+            sb.Append("</svg>");
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// 1ピクセル(scale=1)あたりのmm
+        /// </summary>
+        /// <param name="point">大きさ(8～11.5ポイント)</param>
+        private static double MillimetersPerPixel(double point)
+        {
+            if (double.IsNaN(point) || point < MinPoint || point > MaxPoint)
+            {
+                throw new ArgumentOutOfRangeException(nameof(point), "大きさは8～11.5ポイントで指定してください。");
+            }
+            // バー幅(2ピクセル)が 0.6mm × ポイント / 10
+            return 0.6 * point / 10 / BarWidth;
+        }
+
+        /// <summary>
+        /// SVG出力用の丸め(浮動小数点の誤差を出力しないため)
+        /// </summary>
+        private static double Round(double value) => Math.Round(value, 4);
 
         /// <summary>
         /// バー生成

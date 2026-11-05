@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.Linq;
 using System.Text.RegularExpressions;
-using ZipConvertCustomerBarCode.Properties;
 
 namespace ZipConvertCustomerBarCode
 {
+    /// <summary>
+    /// カスタマバーコード生成
+    /// </summary>
     public static class BarCode
     {
         // 開始コード
@@ -59,44 +59,23 @@ namespace ZipConvertCustomerBarCode
             {"-",10},{"CC1",11},{"CC2",12},{"CC3",13},{"CC4",14},{"CC5",15},{"CC6",16},{"CC7",17},{"CC8",18}
         };
 
-        // 画像リソースキー辞書
-        private static readonly Dictionary<string, string> ImageKeyDic = new Dictionary<string, string>()
-        {
-            {"0","Num0"},{"1","Num1"},{"2","Num2"},{"3","Num3"},{"4","Num4"},{"5","Num5"},
-            {"6","Num6"},{"7","Num7"},{"8","Num8"},{"9","Num9"},{"-","Hyphen"},{"CC1","CC1"},
-            {"CC2","CC2"},{"CC3","CC3"},{"CC4","CC4"},{"CC5","CC5"},{"CC6","CC6"},{"CC7","CC7"},
-            {"CC8","CC8"},{"STC","Start"},{"SPC","End"}
-        };
-
         // アルファベット
         private static readonly string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
         /// <summary>
-        /// 指定したパスにカスタマバーコードを出力する。
+        /// カスタマバーコードを生成する
         /// </summary>
-        /// <param name="zipCode">郵便番号(ハイフンなし半角数字7桁)</param>
+        /// <param name="zipCode">郵便番号(半角・全角数字7桁、ハイフンは可)</param>
         /// <param name="address">住所</param>
-        /// <param name="outputPath">出力先</param>
-        public static void Export(string zipCode, string address, string outputPath)
+        /// <returns>カスタマバーコード</returns>
+        /// <exception cref="ArgumentException">郵便番号が7桁の数値でない場合</exception>
+        public static CustomerBarCode Create(string zipCode, string address)
         {
-            var code = ConvertCustomerBarCode(address, CheckPostCode(zipCode));
-            using (var img = CreateImage(code))
-            {
-                img.Save(outputPath, ImageFormat.Gif);
-            }
-        }
+            if (zipCode == null) throw new ArgumentNullException(nameof(zipCode));
+            if (address == null) throw new ArgumentNullException(nameof(address));
 
-        /// <summary>
-        /// カスタマバーコードのイメージを返す
-        /// </summary>
-        /// <param name="zipCode">郵便番号(ハイフンなし半角数字7桁)</param>
-        /// <param name="address">住所</param>
-        /// <returns>バーコードイメージ</returns>
-        public static Bitmap CreateImage(string zipCode, string address)
-        {
             var code = ConvertCustomerBarCode(address, CheckPostCode(zipCode));
-            var img = CreateImage(code);
-            return img;
+            return new CustomerBarCode(code.ToArray());
         }
 
         /// <summary>
@@ -120,25 +99,6 @@ namespace ZipConvertCustomerBarCode
 
             return zipCode.Select(x => x.ToString());
 
-        }
-
-        /// <summary>
-        /// イメージ生成
-        /// </summary>
-        /// <param name="code">カスタマバーコード</param>
-        /// <returns>バーコードイメージ</returns>
-        private static Bitmap CreateImage(IEnumerable<string> code)
-        {
-            var img = new Bitmap(276, 12);
-            var rmgr = Resources.ResourceManager;
-            using (var gr = Graphics.FromImage(img))
-            {
-                foreach (var c in code.Select((x, i) => new { Value = x, Index = i }))
-                {
-                    gr.DrawImage((Image)rmgr.GetObject(ImageKeyDic[c.Value]), c.Index * 12, 0);
-                }
-            }
-            return img;
         }
 
         /// <summary>
@@ -202,7 +162,7 @@ namespace ZipConvertCustomerBarCode
             }
             target = (new string(tmp)).Replace("@", "");
 
-            // 6. 最後に、先頭がハイフンの場合は取り除きます。            
+            // 6. 最後に、先頭がハイフンの場合は取り除きます。
             return target.Trim('-');
         }
 

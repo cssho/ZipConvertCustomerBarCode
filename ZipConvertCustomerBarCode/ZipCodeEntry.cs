@@ -286,6 +286,25 @@ namespace ZipConvertCustomerBarCode
             return normalized;
         }
 
+        // 郡名を除いた市区町村名(初めて使うときに作る。郡名がない場合は空)
+        private string cityWithoutDistrict;
+
+        /// <summary>
+        /// 郡名を除いた市区町村名(「上川郡東神楽町」の「東神楽町」)。郡名がない場合は null
+        /// </summary>
+        internal string CityWithoutDistrict
+        {
+            get
+            {
+                if (cityWithoutDistrict == null)
+                {
+                    var district = DistrictRegex.Match(City);
+                    cityWithoutDistrict = district.Success ? district.Groups["name"].Value : "";
+                }
+                return cityWithoutDistrict.Length > 0 ? cityWithoutDistrict : null;
+            }
+        }
+
         /// <summary>
         /// 市区町村名までの住所の候補
         /// 都道府県名ありとなし、郡名ありとなし
@@ -295,31 +314,10 @@ namespace ZipConvertCustomerBarCode
             yield return Prefecture + City;
             yield return City;
 
-            var district = DistrictRegex.Match(City);
-            if (district.Success)
+            if (CityWithoutDistrict != null)
             {
-                yield return Prefecture + district.Groups["name"].Value;
-                yield return district.Groups["name"].Value;
-            }
-        }
-
-        /// <summary>
-        /// 住所A(町域名までの住所)の候補
-        /// 市区町村名までの住所の候補 + 町域名(前に「大字」「字」ありとなし。郵便番号データの町域名には付いていない)
-        /// </summary>
-        internal IEnumerable<string> GetTownAddressCandidates()
-        {
-            // 「以下に掲載がない場合」は町域名がわからないため候補なし
-            if (IsRepresentative) yield break;
-
-            var town = GetTownName();
-            var towns = town.Length == 0 ? new[] { town } : new[] { town, "大字" + town, "字" + town };
-            foreach (var city in GetCityCandidates())
-            {
-                foreach (var t in towns)
-                {
-                    yield return city + t;
-                }
+                yield return Prefecture + CityWithoutDistrict;
+                yield return CityWithoutDistrict;
             }
         }
     }

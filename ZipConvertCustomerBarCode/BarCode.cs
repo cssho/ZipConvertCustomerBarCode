@@ -202,19 +202,24 @@ namespace ZipConvertCustomerBarCode
         /// <returns>郵便番号(半角数字7桁)</returns>
         internal static string CheckPostCode(string zipCode)
         {
-            // 全角→半角
-            zipCode = string.Join("", zipCode.Select(ToHankaku));
-
-            // ハイフン除去
-            zipCode = zipCode.Replace("-", "");
-
-            // \d は全角以外の Unicode 数字にも、\Z は末尾の改行にもマッチするため使わない
-            if (!Regex.IsMatch(zipCode, @"\A[0-9]{7}\z"))
+            // 全角→半角にし、ハイフンを除いて半角数字(0～9 のみ。全角以外の Unicode 数字や改行は不可)が7桁であること
+            var digits = new char[7];
+            var count = 0;
+            foreach (var c in zipCode)
             {
-                throw new ArgumentException("郵便番号は7桁の数値で入力してください。");
+                var hankaku = ToHankaku(c);
+                if (hankaku == '-') continue;
+                if (hankaku < '0' || hankaku > '9' || count == digits.Length) throw InvalidPostCode();
+                digits[count++] = hankaku;
             }
+            if (count != digits.Length) throw InvalidPostCode();
 
-            return zipCode;
+            return new string(digits);
+        }
+
+        private static ArgumentException InvalidPostCode()
+        {
+            return new ArgumentException("郵便番号は7桁の数値で入力してください。");
         }
 
         /// <summary>
@@ -273,14 +278,76 @@ namespace ZipConvertCustomerBarCode
         /// <returns>算用数字</returns>
         internal static string KanjiToNumber(string kanji)
         {
-            if (kanji.IndexOfAny(new[] { '十', '百', '千' }) < 0)
-            {
-                return string.Concat(kanji.Select(c => KanjiDigits.IndexOf(c)));
-            }
+            return KanjiToNumber(kanji, 0, kanji.Length);
+        }
 
-            int total = 0, current = 0;
-            foreach (var c in kanji)
+        /// <summary>
+        /// 文字列の一部の漢数字を算用数字に変換する
+        /// </summary>
+        /// <param name="value">文字列</param>
+        /// <param name="start">漢数字の開始位置</param>
+        /// <param name="length">漢数字の長さ</param>
+        /// <returns>算用数字</returns>
+        internal static string KanjiToNumber(string value, int start, int length)
+        {
+            if (!HasKanjiUnit(value, start, length))
             {
+                var digits = new char[length];
+                for (int i = 0; i < length; i++) digits[i] = KanjiDigit(value[start + i]);
+                return new string(digits);
+            }
+            return KanjiValue(value, start, length).ToString(CultureInfo.InvariantCulture);
+        }
+
+#if NET8_0_OR_GREATER
+        /// <summary>
+        /// 文字列の一部の漢数字を算用数字に変換して書き込む
+        /// </summary>
+        /// <param name="value">文字列</param>
+        /// <param name="start">漢数字の開始位置</param>
+        /// <param name="length">漢数字の長さ</param>
+        /// <param name="destination">書き込み先(漢数字の長さの4倍あれば足りる)</param>
+        /// <returns>書き込んだ文字数</returns>
+        internal static int WriteKanjiNumber(string value, int start, int length, Span<char> destination)
+        {
+            if (!HasKanjiUnit(value, start, length))
+            {
+                for (int i = 0; i < length; i++) destination[i] = KanjiDigit(value[start + i]);
+                return length;
+            }
+            KanjiValue(value, start, length).TryFormat(destination, out var written, default, CultureInfo.InvariantCulture);
+            return written;
+        }
+#endif
+
+        // 位取りの漢数字
+        private static readonly char[] KanjiUnits = { '十', '百', '千' };
+
+        /// <summary>
+        /// 位取り(十、百、千)を含むかどうか(含まない場合は「二〇五」のように1文字ずつ数字にする)
+        /// </summary>
+        private static bool HasKanjiUnit(string value, int start, int length)
+        {
+            return value.IndexOfAny(KanjiUnits, start, length) >= 0;
+        }
+
+        /// <summary>
+        /// 位取りなしの漢数字1文字を算用数字にする
+        /// </summary>
+        private static char KanjiDigit(char c)
+        {
+            return (char)('0' + KanjiDigits.IndexOf(c));
+        }
+
+        /// <summary>
+        /// 位取りを含む漢数字(「十一」「千二百三十四」)の値
+        /// </summary>
+        private static int KanjiValue(string value, int start, int length)
+        {
+            int total = 0, current = 0;
+            for (int i = start; i < start + length; i++)
+            {
+                var c = value[i];
                 var digit = KanjiDigits.IndexOf(c);
                 if (digit >= 0)
                 {
@@ -291,7 +358,7 @@ namespace ZipConvertCustomerBarCode
                 total += (current == 0 ? 1 : current) * unit;
                 current = 0;
             }
-            return (total + current).ToString(CultureInfo.InvariantCulture);
+            return total + current;
         }
 
         /// <summary>

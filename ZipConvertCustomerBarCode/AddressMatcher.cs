@@ -53,7 +53,14 @@ namespace ZipConvertCustomerBarCode
         /// <returns>一致した部分の終わり(元の住所での位置)。一致しない場合は -1</returns>
         public int MatchPrefix(string prefix, int start)
         {
+#if NET8_0_OR_GREATER
+            // 正規化した文字列を作らず、スタック上で正規化して比べる(漢数字は1文字が最大4文字になる)
+            var size = prefix.Length * 4;
+            Span<char> buffer = size <= 256 ? stackalloc char[size] : new char[size];
+            return MatchNormalizedPrefix(buffer.Slice(0, NormalizeTo(prefix, buffer)), start);
+#else
             return MatchNormalizedPrefix(Normalize(prefix), start);
+#endif
         }
 
         /// <summary>
@@ -64,12 +71,42 @@ namespace ZipConvertCustomerBarCode
         /// <returns>一致した部分の終わり(元の住所での位置)。一致しない場合は -1</returns>
         public int MatchNormalizedPrefix(string target, int start)
         {
+#if NET8_0_OR_GREATER
+            return MatchNormalizedPrefix(target.AsSpan(), start);
+#else
             var offset = NormalizedIndex(start);
             if (target.Length == 0) return start;
-            if (string.CompareOrdinal(normalized, offset, target, 0, target.Length) != 0 || normalized.Length - offset < target.Length) return -1;
+            if (normalized.Length - offset < target.Length || string.CompareOrdinal(normalized, offset, target, 0, target.Length) != 0) return -1;
+            return MatchEnd(offset, target.Length);
+#endif
+        }
 
+#if NET8_0_OR_GREATER
+        /// <summary>
+        /// 住所の指定位置以降が、正規化済みの町域名などと一致する場合、一致した部分の終わりの位置を返す
+        /// </summary>
+        /// <param name="target">正規化済みの町域名など</param>
+        /// <param name="start">照合を始める位置(元の住所での位置)</param>
+        /// <returns>一致した部分の終わり(元の住所での位置)。一致しない場合は -1</returns>
+        public int MatchNormalizedPrefix(ReadOnlySpan<char> target, int start)
+        {
+            var offset = NormalizedIndex(start);
+            if (target.Length == 0) return start;
+            if (!normalized.AsSpan(offset).StartsWith(target, StringComparison.Ordinal)) return -1;
+            return MatchEnd(offset, target.Length);
+        }
+#endif
+
+        /// <summary>
+        /// 正規化後の住所で一致した部分の終わりを、元の住所での位置に変換する
+        /// </summary>
+        /// <param name="offset">一致した部分の開始位置(正規化後)</param>
+        /// <param name="length">一致した部分の長さ(正規化後)</param>
+        /// <returns>一致した部分の終わり(元の住所での位置)。漢数字の途中で終わる場合は -1</returns>
+        private int MatchEnd(int offset, int length)
+        {
             // 漢数字の途中で終わる場合(「二十」の「2」だけが一致した場合など)は一致としない
-            var last = offset + target.Length - 1;
+            var last = offset + length - 1;
             if (last + 1 < normalized.Length && ends[last + 1] == ends[last]) return -1;
             return ends[last];
         }
@@ -149,16 +186,15 @@ namespace ZipConvertCustomerBarCode
                 }
 
                 // 漢数字の並びは算用数字に変換する
-                if (KanjiNumerals.IndexOf(c) >= 0)
+                var kanjiEnd = KanjiRunEnd(value, i);
+                if (kanjiEnd > i)
                 {
-                    int j = i;
-                    while (j < value.Length && KanjiNumerals.IndexOf(value[j]) >= 0) j++;
-                    foreach (var d in BarCode.KanjiToNumber(value.Substring(i, j - i)))
+                    foreach (var d in BarCode.KanjiToNumber(value, i, kanjiEnd - i))
                     {
                         sb.Append(d);
-                        ends?.Add(j);
+                        ends?.Add(kanjiEnd);
                     }
-                    i = j;
+                    i = kanjiEnd;
                     continue;
                 }
 
@@ -166,6 +202,52 @@ namespace ZipConvertCustomerBarCode
                 ends?.Add(i + 1);
                 i++;
             }
+        }
+
+#if NET8_0_OR_GREATER
+        /// <summary>
+        /// 住所を照合用に正規化して書き込む(<see cref="Normalize(string)"/> の文字列を作らない版)
+        /// </summary>
+        /// <param name="value">住所</param>
+        /// <param name="destination">書き込み先(住所の長さの4倍あれば足りる)</param>
+        /// <returns>書き込んだ文字数</returns>
+        private static int NormalizeTo(string value, Span<char> destination)
+        {
+            int i = 0, written = 0;
+            while (i < value.Length)
+            {
+                var c = value[i];
+                if (char.IsWhiteSpace(c))
+                {
+                    i++;
+                    continue;
+                }
+
+                // 漢数字の並びは算用数字に変換する
+                var kanjiEnd = KanjiRunEnd(value, i);
+                if (kanjiEnd > i)
+                {
+                    written += BarCode.WriteKanjiNumber(value, i, kanjiEnd - i, destination.Slice(written));
+                    i = kanjiEnd;
+                    continue;
+                }
+
+                destination[written++] = NormalizeChar(c);
+                i++;
+            }
+            return written;
+        }
+#endif
+
+        /// <summary>
+        /// 指定位置から漢数字が続く場合、その終わりの位置を返す
+        /// </summary>
+        /// <returns>漢数字の並びの終わりの位置。漢数字で始まらない場合は指定位置</returns>
+        private static int KanjiRunEnd(string value, int start)
+        {
+            int end = start;
+            while (end < value.Length && KanjiNumerals.IndexOf(value[end]) >= 0) end++;
+            return end;
         }
 
         /// <summary>

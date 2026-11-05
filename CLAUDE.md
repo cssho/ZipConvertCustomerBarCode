@@ -8,17 +8,20 @@
 
 ## 構成・ビルド
 
-- ライブラリは 3 つ、すべて `netstandard2.0`（SDK スタイル）。ビルドは `dotnet build ZipConvertCustomerBarCode.sln`。
-  - `ZipConvertCustomerBarCode`: コア。外部依存を追加しない（描画ライブラリに依存させないのが分割の目的）。
+- ライブラリは 3 つ（SDK スタイル）。ビルドは `dotnet build ZipConvertCustomerBarCode.sln`。
+  - `ZipConvertCustomerBarCode`: コア。`netstandard2.0` と `net8.0`。外部依存を追加しない（描画ライブラリに依存させないのが分割の目的。`System.Memory` も入れない）。
+    - `Span<T>` などは `#if NET8_0_OR_GREATER` の中だけで使い、`#else` に `netstandard2.0` 用の処理を書く。`#if` は小さな範囲（メソッドや構造体の中）に閉じ込め、共通にできる部分は共通のメソッドにする。
+    - `Span` を使うのは計測で効果があった箇所のみ（住所照合の正規化、CSV の読み込み）。`Span` を使わなくても両方で速くできる場合は、`#if` を使わず共通のコードにする。
   - `ZipConvertCustomerBarCode.Drawing`: System.Drawing.Common による描画（Windows のみ）。
   - `ZipConvertCustomerBarCode.SkiaSharp`: SkiaSharp による描画。名前空間は `SkiaSharp` との衝突を避けるため `ZipConvertCustomerBarCode.Skia`。
-- `netstandard2.0` の既定 C# は 7.3。`record` や null 許容参照型など新しい構文は使わない。
+- `netstandard2.0` の既定 C# は 7.3。`#if NET8_0_OR_GREATER` の外では `record` や null 許容参照型など新しい構文は使わない。
 - バージョン・著作権表示は `Directory.Build.props` にまとめている。
 - 公開メンバーには XML ドキュメントコメントを付ける（`GenerateDocumentationFile` 有効のため、ないと警告になる）。
 
 ## テスト
 
 - `dotnet test` で実行（xUnit v3、net10.0）。`global.json` で Microsoft.Testing.Platform を指定しているため、`Microsoft.NET.Test.Sdk` や `xunit.runner.visualstudio` は追加しない。
+- コアは `#if` で処理が分かれるため、変更したら両方のビルドでテストする: `dotnet test`（net8.0 版）と `dotnet test -p:CoreTargetFramework=netstandard2.0`。`TargetFrameworkTests` が、指定したビルドが実際に使われていることを確認する。
 - `TestData/cases.tsv` と `v1-*.png` は 1.x（.NET Framework 版）の出力で、シンボル列と画像がこれとピクセル単位で一致することを確認している。1.x がマニュアルと異なっていたケース（補足ルール対象など）は除いてあり、それらは `SupplementaryRuleTests` でマニュアルの「バーコード・データ」を期待値にしている。出力が変わる修正をした場合は、マニュアルに照らして意図した変更か確認してから期待値を更新する。
 - `cases.tsv` はタブ区切り（郵便番号・住所・シンボル列・画像ファイル名）。住所が空の行があるので、シェルで加工するときは連続するタブがまとめられないよう注意する。
 - System.Drawing のテストは Windows 以外ではスキップされる。

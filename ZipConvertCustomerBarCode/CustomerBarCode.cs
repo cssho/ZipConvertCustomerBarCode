@@ -37,10 +37,11 @@ namespace ZipConvertCustomerBarCode
             {"STC"," LD"},{"SPC","DL "}
         };
 
-        internal CustomerBarCode(string zipCode, string addressNumber, IEnumerable<string> symbols)
+        internal CustomerBarCode(string zipCode, string addressNumber, bool isRepresentativeZipCode, IEnumerable<string> symbols)
         {
             ZipCode = zipCode;
             AddressNumber = addressNumber;
+            IsRepresentativeZipCode = isRepresentativeZipCode;
             // 呼び出し側から書き換えられないよう、コピーを読み取り専用で保持する
             Symbols = new ReadOnlyCollection<string>(symbols.ToArray());
         }
@@ -57,14 +58,15 @@ namespace ZipConvertCustomerBarCode
         public string AddressNumber { get; }
 
         /// <summary>
-        /// 代表の郵便番号かどうか(下2けたが"00")
+        /// 代表の郵便番号かどうか
         /// </summary>
         /// <remarks>
         /// 代表の郵便番号(郵便番号簿の「以下に掲載がない場合」の番号)の郵便物には、カスタマバーコードを付けない。
-        /// マニュアルでは代表の郵便番号は「原則として」下2けたが"00"とされているため、下2けたで判定している。
+        /// 郵便番号データ(<see cref="ZipCodeDictionary"/>)を渡して生成した場合は、郵便番号データに基づいて判定する。
+        /// 渡さずに生成した場合は、マニュアルの「原則として下2けたが"00"」に従って判定する目安。
         /// http://www.post.japanpost.jp/zipcode/zipmanual/p18.html
         /// </remarks>
-        public bool IsRepresentativeZipCode => ZipCode.EndsWith("00", StringComparison.Ordinal);
+        public bool IsRepresentativeZipCode { get; }
 
         /// <summary>
         /// シンボル列

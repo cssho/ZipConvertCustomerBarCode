@@ -88,6 +88,62 @@ namespace ZipConvertCustomerBarCode
             if (address == null) throw new ArgumentNullException(nameof(address));
 
             var zip = CheckPostCode(zipCode);
+            return CreateCore(zip, address, IsRepresentativeByRule(zip));
+        }
+
+        /// <summary>
+        /// 郵便番号データを使ってカスタマバーコードを生成する
+        /// </summary>
+        /// <remarks>
+        /// 郵便番号データの町域名で住所を住所A(町域名まで)と住所B(町域名以降)に分割し、住所Bから住所表示番号を抜き出す。
+        /// 分割できない場合(町域名の表記が一致しない場合など)は、住所全体を住所Bとして扱う。
+        /// <see cref="CustomerBarCode.IsRepresentativeZipCode"/> は郵便番号データに基づいて判定する。
+        /// </remarks>
+        /// <param name="zipCode">郵便番号(半角・全角数字7桁、ハイフンは可)</param>
+        /// <param name="address">住所</param>
+        /// <param name="dictionary">郵便番号データ</param>
+        /// <returns>カスタマバーコード</returns>
+        /// <exception cref="ArgumentException">郵便番号が7桁の数値でない場合</exception>
+        public static CustomerBarCode Create(string zipCode, string address, ZipCodeDictionary dictionary)
+        {
+            if (zipCode == null) throw new ArgumentNullException(nameof(zipCode));
+            if (address == null) throw new ArgumentNullException(nameof(address));
+            if (dictionary == null) throw new ArgumentNullException(nameof(dictionary));
+
+            var zip = CheckPostCode(zipCode);
+            var entries = dictionary.FindEntries(zip);
+            if (entries == null)
+            {
+                // 郵便番号データにない番号(事業所の個別番号、郵便番号データより新しい番号など)は
+                // 住所全体を住所Bとし、代表の郵便番号は下2けたで判定する
+                return CreateCore(zip, address, IsRepresentativeByRule(zip));
+            }
+
+            if (ZipCodeDictionary.TrySplitAddress(entries, address, out _, out var blockAddress))
+            {
+                address = blockAddress;
+            }
+            return CreateCore(zip, address, entries.Any(x => x.IsRepresentative));
+        }
+
+        /// <summary>
+        /// 代表の郵便番号の判定(原則として下2けたが"00")
+        /// </summary>
+        /// <param name="zip">郵便番号(半角数字7桁)</param>
+        private static bool IsRepresentativeByRule(string zip)
+        {
+            return zip.EndsWith("00", StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// カスタマバーコード生成
+        /// </summary>
+        /// <param name="zip">郵便番号(半角数字7桁)</param>
+        /// <param name="address">住所B</param>
+        /// <param name="isRepresentative">代表の郵便番号かどうか</param>
+        /// <returns>カスタマバーコード</returns>
+        private static CustomerBarCode CreateCore(string zip, string address, bool isRepresentative)
+        {
             var addressNumber = ExtractAddressNumber(address);
             var customerCode = ConvertCCode(addressNumber);
 
@@ -96,7 +152,7 @@ namespace ZipConvertCustomerBarCode
                 .Concat(zip.Select(x => x.ToString()))
                 .Concat(customerCode)
                 .Concat(new[] { CalcCheckDigit(zip.Select(x => x.ToString()), customerCode), endCode });
-            return new CustomerBarCode(zip, addressNumber, symbols);
+            return new CustomerBarCode(zip, addressNumber, isRepresentative, symbols);
         }
 
         /// <summary>
@@ -105,6 +161,7 @@ namespace ZipConvertCustomerBarCode
         /// <remarks>
         /// 住所表示番号は住所Bからのみ抜き出す。
         /// 住所Bが住所Aで始まる場合(住所全体が渡された場合)は、住所Aの部分を取り除いてから抜き出す。
+        /// 住所Aとの比較では、空白、全角・半角、「ヶ」と「ケ」の違いは区別しない。
         /// http://www.post.japanpost.jp/zipcode/zipmanual/p17.html
         /// </remarks>
         /// <param name="zipCode">郵便番号(半角・全角数字7桁、ハイフンは可)</param>
@@ -117,10 +174,10 @@ namespace ZipConvertCustomerBarCode
             if (townAddress == null) throw new ArgumentNullException(nameof(townAddress));
             if (blockAddress == null) throw new ArgumentNullException(nameof(blockAddress));
 
-            var town = townAddress.Trim();
-            if (town.Length > 0 && blockAddress.StartsWith(town, StringComparison.Ordinal))
+            var end = AddressMatcher.MatchPrefix(blockAddress, townAddress);
+            if (end > 0)
             {
-                blockAddress = blockAddress.Substring(town.Length);
+                blockAddress = blockAddress.Substring(end);
             }
             return Create(zipCode, blockAddress);
         }
@@ -131,10 +188,10 @@ namespace ZipConvertCustomerBarCode
         /// </summary>
         /// <param name="zipCode">郵便番号</param>
         /// <returns>郵便番号(半角数字7桁)</returns>
-        private static string CheckPostCode(string zipCode)
+        internal static string CheckPostCode(string zipCode)
         {
             // 全角→半角
-            zipCode = string.Join("", zipCode.Select(n => (HankakuDic.ContainsKey(n) ? HankakuDic[n] : n)));
+            zipCode = string.Join("", zipCode.Select(ToHankaku));
 
             // ハイフン除去
             zipCode = zipCode.Replace("-", "");
@@ -149,6 +206,16 @@ namespace ZipConvertCustomerBarCode
         }
 
         /// <summary>
+        /// 全角→半角(数字、アルファベット、空白、ハイフン)
+        /// </summary>
+        /// <param name="c">文字</param>
+        /// <returns>変換後の文字</returns>
+        internal static char ToHankaku(char c)
+        {
+            return HankakuDic.TryGetValue(c, out var hankaku) ? hankaku : c;
+        }
+
+        /// <summary>
         /// 住所表示番号の抜き出し
         /// </summary>
         /// <param name="address">住所</param>
@@ -156,7 +223,7 @@ namespace ZipConvertCustomerBarCode
         private static string ExtractAddressNumber(string address)
         {
             // 全角→半角
-            address = string.Join("", address.Select(n => (HankakuDic.ContainsKey(n) ? HankakuDic[n] : n)));
+            address = string.Join("", address.Select(ToHankaku));
 
             // http://www.post.japanpost.jp/zipcode/zipmanual/p19.html
             // 1. まず、データ内にあるアルファベットの小文字は大文字に置き換えます。

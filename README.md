@@ -39,6 +39,28 @@ CustomerBarCode code = BarCode.Create("1000013", "東京都千代田区霞が関
 
 ただしこの場合は住所全体を住所Bとして扱うため、町域名に「丁目・番・ノ」などの前の漢数字を含む住所（一番町、八丁堀、三ノ輪 など）では、町域名の漢数字も抜き出されて誤ったバーコードになります。住所A・住所Bに分けて渡すことをおすすめします。
 
+### 郵便番号データを使う
+日本郵便の[郵便番号データ（1レコード1行、UTF-8形式）](https://www.post.japanpost.jp/zipcode/dl/utf-zip.html)を読み込むと、郵便番号の町域名で住所を住所A・住所Bに自動で分割できます。住所全体を渡しても、町域名の漢数字（一番町、八丁堀など）を抜き出さなくなります。
+
+データは同梱していないので、`utf_ken_all.zip` をダウンロードして指定してください（zip のままでも、展開した `utf_ken_all.csv` でも読み込めます）。データは毎月更新されます。
+
+```csharp
+// 読み込みには時間がかかるので、一度読み込んだものを使い回す
+ZipCodeDictionary dictionary = ZipCodeDictionary.Load(@"c:\data\utf_ken_all.zip");
+
+CustomerBarCode code = BarCode.Create("1020082", "東京都千代田区一番町5-3", dictionary);
+// code.AddressNumber → "5-3"(郵便番号データなしでは "1-5-3")
+```
+
+- `ZipCodeDictionary` は破棄（`Dispose`）不要です。`Load(パス)` はファイルを読み終えると閉じます。`Load(Stream)` は渡された Stream を閉じないので、呼び出し側で破棄してください。
+- 読み込んだデータはメモリ上に保持します（全国分で約 22MB）。
+- 都道府県名の省略、町域名の前の「大字」「字」の有無、空白、全角・半角、「ヶ」と「ケ」の違いは区別しません。
+- 町域名が一致せず分割できない場合は、住所全体から抜き出します（郵便番号データなしと同じ）。分割できるかどうかは `dictionary.TrySplitAddress()` で確認できます。
+- 代表の郵便番号（町域名が「以下に掲載がない場合」）は町域名がわからないため、分割しません。
+- `IsRepresentativeZipCode` は郵便番号データに基づいて判定します。郵便番号データにない番号（郵便番号データより新しい番号など）は、下2けたで判定します。
+- 従来の Shift_JIS 形式（KEN_ALL.CSV）は、長い町域名が複数行に分かれているため対象外です。
+- 大口事業所の個別郵便番号は郵便番号データに含まれないため、分割できません。
+
 ### バーコードの内容
 ```csharp
 string zip = code.ZipCode;             // "1000013"
@@ -48,7 +70,7 @@ bool rep = code.IsRepresentativeZipCode; // 代表の郵便番号か
 
 `AddressNumber` は 13 けたで切り捨てる前の値です。バーコードに含まれるのは先頭 13 けた分です。
 
-代表の郵便番号（郵便番号簿の「以下に掲載がない場合」の番号）の郵便物には、カスタマバーコードを付けないことになっています（[マニュアル p18](https://www.post.japanpost.jp/zipcode/zipmanual/p18.html)）。`IsRepresentativeZipCode` は、マニュアルの「原則として下2けたが 00」に従って判定します。
+代表の郵便番号（郵便番号簿の「以下に掲載がない場合」の番号）の郵便物には、カスタマバーコードを付けないことになっています（[マニュアル p18](https://www.post.japanpost.jp/zipcode/zipmanual/p18.html)）。`IsRepresentativeZipCode` は、郵便番号データを使わない場合はマニュアルの「原則として下2けたが 00」に従って判定する目安です。正確に判定するには郵便番号データを使ってください。
 
 ### 印刷用の実寸
 [マニュアル p12](https://www.post.japanpost.jp/zipcode/zipmanual/p12.html) の寸法（10 ポイントのときバー幅 0.6mm、バーピッチ 1.2mm、ロングバー 3.6mm）で出力します。大きさは 8〜11.5 ポイントで指定でき、省略時は 10 ポイントです。

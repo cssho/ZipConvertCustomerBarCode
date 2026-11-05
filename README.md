@@ -18,6 +18,15 @@
 
 SkiaSharp を Linux で使う場合は、利用側で `SkiaSharp.NativeAssets.Linux` パッケージも参照してください。
 
+## インストール
+NuGet から追加します。描画パッケージを追加すると、コアも一緒に追加されます。
+
+```
+dotnet add package ZipConvertCustomerBarCode
+dotnet add package ZipConvertCustomerBarCode.SkiaSharp   # SkiaSharp で描画する場合
+dotnet add package ZipConvertCustomerBarCode.Drawing     # System.Drawing で描画する場合
+```
+
 ## 使い方
 ### バーコード生成
 ```csharp

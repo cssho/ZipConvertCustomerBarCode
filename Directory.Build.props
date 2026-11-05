@@ -1,10 +1,36 @@
 <Project>
 
   <PropertyGroup>
+    <!-- CI ではタグ(v2.0.0 など)のバージョンを -p:Version で指定する -->
     <Version>2.0.0</Version>
-    <Company>Toshiba</Company>
+    <Authors>cssho</Authors>
     <Product>ZipConvertCustomerBarCode</Product>
-    <Copyright>Copyright © Toshiba 2015</Copyright>
+    <Copyright>Copyright (c) 2015 cssho</Copyright>
   </PropertyGroup>
+
+  <!-- NuGet パッケージ -->
+  <PropertyGroup>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/cssho/ZipConvertCustomerBarCode</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/cssho/ZipConvertCustomerBarCode</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>customer-barcode;barcode;japan-post;postal-code;zipcode;カスタマバーコード;郵便番号</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <!--
+      パッケージ作成時に、net8.0 版が netstandard2.0 版の公開 API をすべて持っているかを確認する
+      (#if で net8.0 版から API が欠けるとエラー CP0002。net8.0 版にだけ API を足すのは検出しない)
+    -->
+    <EnablePackageValidation>true</EnablePackageValidation>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
 
 </Project>

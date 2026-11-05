@@ -27,6 +27,14 @@
 - System.Drawing のテストは Windows 以外ではスキップされる。
 - `TestData/ken_all_sample.csv` は utf_ken_all.csv の形式で手書きしたテスト用データ（実データの抜粋ではない）。実際の郵便番号データ（約12万件）はリポジトリに含めない。
 - `TestData/jigyosyo_sample.csv` は JIGYOSYO.CSV の形式で手書きしたテスト用データで、実データと同じく Shift_JIS・CRLF。編集するときは UTF-8 で書いて `iconv -f UTF-8 -t CP932` で変換する（`.gitattributes` で binary 指定）。
+- テストプロジェクトの `SkiaSharp.NativeAssets.Linux.NoDependencies` は CI（Linux）用。ライブラリ本体には追加しない。
+
+## CI・リリース
+
+- `.github/workflows/build.yml`: push・PR で Ubuntu と Windows × コアの両方のビルドをテストし、パッケージを作る。
+- リリースは `v2.0.0` のようなタグを push すると、タグのバージョンで3パッケージを nuget.org に公開する（Trusted Publishing。ワークフローのファイル名 `build.yml` と Environment 名 `release` を nuget.org に登録しているので、どちらも名前を変えない）。
+- 公開ジョブは GitHub の `release` Environment で動く（`v*` タグのみ、cssho の承認後に実行。Secret `NUGET_USER` もこの Environment にある）。`Directory.Build.props` の `Version` はローカル用で、公開時はタグが優先される。
+- パッケージ作成時の検証（`EnablePackageValidation`）で、net8.0 版から netstandard2.0 版の公開 API が欠けているとエラー（CP0002）になる。
 
 ## コード規約
 

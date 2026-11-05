@@ -23,6 +23,7 @@
 - `cases.tsv` はタブ区切り（郵便番号・住所・シンボル列・画像ファイル名）。住所が空の行があるので、シェルで加工するときは連続するタブがまとめられないよう注意する。
 - System.Drawing のテストは Windows 以外ではスキップされる。
 - `TestData/ken_all_sample.csv` は utf_ken_all.csv の形式で手書きしたテスト用データ（実データの抜粋ではない）。実際の郵便番号データ（約12万件）はリポジトリに含めない。
+- `TestData/jigyosyo_sample.csv` は JIGYOSYO.CSV の形式で手書きしたテスト用データで、実データと同じく Shift_JIS・CRLF。編集するときは UTF-8 で書いて `iconv -f UTF-8 -t CP932` で変換する（`.gitattributes` で binary 指定）。
 
 ## コード規約
 

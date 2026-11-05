@@ -1,0 +1,2 @@
+# Shift_JIS のテスト用データは改行・文字コードを変換しない
+ZipConvertCustomerBarCode.Tests/TestData/jigyosyo_sample.csv binary

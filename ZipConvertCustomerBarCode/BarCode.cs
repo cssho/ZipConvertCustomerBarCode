@@ -98,6 +98,8 @@ namespace ZipConvertCustomerBarCode
         /// 郵便番号データの町域名で住所を住所A(町域名まで)と住所B(町域名以降)に分割し、住所Bから住所表示番号を抜き出す。
         /// 分割できない場合(町域名の表記が一致しない場合など)は、住所全体を住所Bとして扱う。
         /// <see cref="CustomerBarCode.IsRepresentativeZipCode"/> は郵便番号データに基づいて判定する。
+        /// 大口事業所・私書箱の個別郵便番号(事業所の個別郵便番号データを読み込んだ場合)は、マニュアルに従い
+        /// 個別番号のみをバーコード化し、住所表示番号は抜き出さない(13けたすべて CC4)。
         /// </remarks>
         /// <param name="zipCode">郵便番号(半角・全角数字7桁、ハイフンは可)</param>
         /// <param name="address">住所</param>
@@ -117,6 +119,13 @@ namespace ZipConvertCustomerBarCode
                 // 郵便番号データにない番号(事業所の個別番号、郵便番号データより新しい番号など)は
                 // 住所全体を住所Bとし、代表の郵便番号は下2けたで判定する
                 return CreateCore(zip, address, IsRepresentativeByRule(zip));
+            }
+
+            // 大口事業所・私書箱の個別郵便番号は、個別番号のみをバーコード化し、住所表示番号の13けたは CC4 で埋める
+            // http://www.post.japanpost.jp/zipcode/zipmanual/p22.html
+            if (entries.Any(x => x.IsIndividual))
+            {
+                return CreateCore(zip, "", false);
             }
 
             if (ZipCodeDictionary.TrySplitAddress(entries, address, out _, out var blockAddress))
@@ -161,7 +170,7 @@ namespace ZipConvertCustomerBarCode
         /// <remarks>
         /// 住所表示番号は住所Bからのみ抜き出す。
         /// 住所Bが住所Aで始まる場合(住所全体が渡された場合)は、住所Aの部分を取り除いてから抜き出す。
-        /// 住所Aとの比較では、空白、全角・半角、「ヶ」と「ケ」の違いは区別しない。
+        /// 住所Aとの比較では、空白、全角・半角、「ヶ」と「ケ」、漢数字と算用数字の違いは区別しない。
         /// http://www.post.japanpost.jp/zipcode/zipmanual/p17.html
         /// </remarks>
         /// <param name="zipCode">郵便番号(半角・全角数字7桁、ハイフンは可)</param>
@@ -174,7 +183,7 @@ namespace ZipConvertCustomerBarCode
             if (townAddress == null) throw new ArgumentNullException(nameof(townAddress));
             if (blockAddress == null) throw new ArgumentNullException(nameof(blockAddress));
 
-            var end = AddressMatcher.MatchPrefix(blockAddress, townAddress);
+            var end = new AddressMatcher(blockAddress).MatchPrefix(townAddress);
             if (end > 0)
             {
                 blockAddress = blockAddress.Substring(end);
@@ -259,7 +268,7 @@ namespace ZipConvertCustomerBarCode
         /// </summary>
         /// <param name="kanji">漢数字</param>
         /// <returns>算用数字</returns>
-        private static string KanjiToNumber(string kanji)
+        internal static string KanjiToNumber(string kanji)
         {
             if (kanji.IndexOfAny(new[] { '十', '百', '千' }) < 0)
             {

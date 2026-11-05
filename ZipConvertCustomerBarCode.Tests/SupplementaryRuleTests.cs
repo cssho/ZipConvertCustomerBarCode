@@ -76,12 +76,19 @@ namespace ZipConvertCustomerBarCode.Tests
             Assert.Equal("1-2", ToBarCodeData(BarCode.Create("1100011", "東京都台東区三ノ輪", "1丁目2")));
         }
 
-        [Fact]
-        public void 住所Bが住所Aで始まる場合は住所Aを取り除く()
+        [Theory]
+        [InlineData("1040032", "東京都中央区八丁堀", "東京都中央区八丁堀2丁目1-1", "2-1-1")]
+        // 空白、全角・半角、ヶ と ケ の違いは区別しない
+        [InlineData("1020082", "東京都千代田区一番町", "東京都 千代田区一番町5-3", "5-3")]
+        [InlineData("1020082", " 東京都千代田区一番町 ", "東京都千代田区一番町５－３", "5-3")]
+        [InlineData("2730102", "千葉県鎌ケ谷市右京塚", "千葉県鎌ヶ谷市右京塚東3丁目-20-5", "3-20-5")]
+        // 住所Aが空
+        [InlineData("1040032", "", "2丁目1-1", "2-1-1")]
+        public void 住所Bが住所Aで始まる場合は住所Aを取り除く(string zipCode, string townAddress, string blockAddress, string expected)
         {
-            var code = BarCode.Create("1040032", "東京都中央区八丁堀", "東京都中央区八丁堀2丁目1-1");
+            var code = BarCode.Create(zipCode, townAddress, blockAddress);
 
-            Assert.Equal("2-1-1", ToBarCodeData(code));
+            Assert.Equal(expected, ToBarCodeData(code));
         }
 
         [Fact]

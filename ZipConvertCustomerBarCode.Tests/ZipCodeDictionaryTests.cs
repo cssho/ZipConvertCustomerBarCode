@@ -112,8 +112,6 @@ namespace ZipConvertCustomerBarCode.Tests
         [InlineData("0270203", "岩手県宮古市大字津軽石第二地割原　郵便番号CD-1", "岩手県宮古市大字津軽石", "第二地割原　郵便番号CD-1")]
         [InlineData("0270203", "宮古市字津軽石10", "宮古市字津軽石", "10")]
         [InlineData("0270203", "岩手県宮古市津軽石10", "岩手県宮古市津軽石", "10")]
-        // 以下に掲載がない場合
-        [InlineData("1000000", "東京都千代田区丸の内9-9", "東京都千代田区", "丸の内9-9")]
         // ○○村一円
         [InlineData("9013601", "沖縄県島尻郡渡名喜村1917", "沖縄県島尻郡渡名喜村", "1917")]
         // ○○町の次に番地がくる場合
@@ -135,6 +133,8 @@ namespace ZipConvertCustomerBarCode.Tests
         [InlineData("1008798", "東京都千代田区丸の内2-7-2")]
         // 町域名が一致しない
         [InlineData("1020082", "大阪府大阪市北区梅田1-1")]
+        // 代表の郵便番号(以下に掲載がない場合)は町域名がわからない
+        [InlineData("1000000", "東京都千代田区一番町5-3")]
         public void 分割できない場合はfalse(string zipCode, string address)
         {
             Assert.False(Dictionary.TrySplitAddress(zipCode, address, out var townAddress, out var blockAddress));
@@ -165,11 +165,21 @@ namespace ZipConvertCustomerBarCode.Tests
         [Theory]
         [InlineData("1000000", true)]
         [InlineData("1000013", false)]
-        // 下2けたが00だが郵便番号データにない
-        [InlineData("3510100", false)]
+        // 郵便番号データにない場合(郵便番号データが古い場合など)は下2けたで判定する
+        [InlineData("3510100", true)]
+        [InlineData("1008798", false)]
         public void 郵便番号データで代表の郵便番号を判定する(string zipCode, bool expected)
         {
             Assert.Equal(expected, BarCode.Create(zipCode, "1-1", Dictionary).IsRepresentativeZipCode);
+        }
+
+        [Fact]
+        public void 代表の郵便番号では住所を分割しない()
+        {
+            var code = BarCode.Create("1000000", "東京都千代田区一番町5-3", Dictionary);
+
+            Assert.Equal(BarCode.Create("1000000", "東京都千代田区一番町5-3").Symbols, code.Symbols);
+            Assert.True(code.IsRepresentativeZipCode);
         }
 
         [Fact]

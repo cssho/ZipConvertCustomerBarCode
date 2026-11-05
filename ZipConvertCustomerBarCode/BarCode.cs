@@ -88,8 +88,7 @@ namespace ZipConvertCustomerBarCode
             if (address == null) throw new ArgumentNullException(nameof(address));
 
             var zip = CheckPostCode(zipCode);
-            // 代表の郵便番号は原則として下2けたが"00"
-            return CreateCore(zip, address, zip.EndsWith("00", StringComparison.Ordinal));
+            return CreateCore(zip, address, IsRepresentativeByRule(zip));
         }
 
         /// <summary>
@@ -112,12 +111,28 @@ namespace ZipConvertCustomerBarCode
             if (dictionary == null) throw new ArgumentNullException(nameof(dictionary));
 
             var zip = CheckPostCode(zipCode);
-            if (dictionary.TrySplitAddress(zip, address, out _, out var blockAddress))
+            var entries = dictionary.FindEntries(zip);
+            if (entries == null)
+            {
+                // 郵便番号データにない番号(事業所の個別番号、郵便番号データより新しい番号など)は
+                // 住所全体を住所Bとし、代表の郵便番号は下2けたで判定する
+                return CreateCore(zip, address, IsRepresentativeByRule(zip));
+            }
+
+            if (ZipCodeDictionary.TrySplitAddress(entries, address, out _, out var blockAddress))
             {
                 address = blockAddress;
             }
-            // 郵便番号データにない番号(事業所の個別番号など)は代表の郵便番号ではない
-            return CreateCore(zip, address, dictionary.IsRepresentative(zip) ?? false);
+            return CreateCore(zip, address, entries.Any(x => x.IsRepresentative));
+        }
+
+        /// <summary>
+        /// 代表の郵便番号の判定(原則として下2けたが"00")
+        /// </summary>
+        /// <param name="zip">郵便番号(半角数字7桁)</param>
+        private static bool IsRepresentativeByRule(string zip)
+        {
+            return zip.EndsWith("00", StringComparison.Ordinal);
         }
 
         /// <summary>
@@ -146,6 +161,7 @@ namespace ZipConvertCustomerBarCode
         /// <remarks>
         /// 住所表示番号は住所Bからのみ抜き出す。
         /// 住所Bが住所Aで始まる場合(住所全体が渡された場合)は、住所Aの部分を取り除いてから抜き出す。
+        /// 住所Aとの比較では、空白、全角・半角、「ヶ」と「ケ」の違いは区別しない。
         /// http://www.post.japanpost.jp/zipcode/zipmanual/p17.html
         /// </remarks>
         /// <param name="zipCode">郵便番号(半角・全角数字7桁、ハイフンは可)</param>
@@ -158,10 +174,10 @@ namespace ZipConvertCustomerBarCode
             if (townAddress == null) throw new ArgumentNullException(nameof(townAddress));
             if (blockAddress == null) throw new ArgumentNullException(nameof(blockAddress));
 
-            var town = townAddress.Trim();
-            if (town.Length > 0 && blockAddress.StartsWith(town, StringComparison.Ordinal))
+            var end = AddressMatcher.MatchPrefix(blockAddress, townAddress);
+            if (end > 0)
             {
-                blockAddress = blockAddress.Substring(town.Length);
+                blockAddress = blockAddress.Substring(end);
             }
             return Create(zipCode, blockAddress);
         }

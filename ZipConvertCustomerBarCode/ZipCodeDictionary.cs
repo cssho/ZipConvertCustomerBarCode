@@ -74,6 +74,15 @@ namespace ZipConvertCustomerBarCode
             if (stream == null) throw new ArgumentNullException(nameof(stream));
 
             var entries = new Dictionary<string, List<ZipCodeEntry>>();
+            // 都道府県名・市区町村名は種類が少ないため、同じ文字列を共有してメモリを減らす
+            var names = new Dictionary<string, string>();
+            string Share(string name)
+            {
+                if (names.TryGetValue(name, out var shared)) return shared;
+                names.Add(name, name);
+                return name;
+            }
+
             using (var reader = new StreamReader(stream, new UTF8Encoding(false), true, 4096, true))
             {
                 string line;
@@ -102,7 +111,7 @@ namespace ZipConvertCustomerBarCode
                     }
 
                     // 7:都道府県名 8:市区町村名 9:町域名(漢字)
-                    var entry = new ZipCodeEntry(zipCode, Unquote(fields[6]), Unquote(fields[7]), Unquote(fields[8]));
+                    var entry = new ZipCodeEntry(zipCode, Share(Unquote(fields[6])), Share(Unquote(fields[7])), Unquote(fields[8]));
                     if (!entries.TryGetValue(zipCode, out var list))
                     {
                         list = new List<ZipCodeEntry>();
@@ -122,7 +131,17 @@ namespace ZipConvertCustomerBarCode
         public bool Contains(string zipCode)
         {
             if (zipCode == null) throw new ArgumentNullException(nameof(zipCode));
-            return entries.ContainsKey(BarCode.CheckPostCode(zipCode));
+            return FindEntries(BarCode.CheckPostCode(zipCode)) != null;
+        }
+
+        /// <summary>
+        /// 郵便番号の町域を返す
+        /// </summary>
+        /// <param name="zip">郵便番号(半角数字7桁)</param>
+        /// <returns>町域。郵便番号データにない場合は null</returns>
+        internal ZipCodeEntry[] FindEntries(string zip)
+        {
+            return entries.TryGetValue(zip, out var list) ? list : null;
         }
 
         /// <summary>
@@ -134,7 +153,7 @@ namespace ZipConvertCustomerBarCode
         public IReadOnlyList<ZipCodeEntry> Find(string zipCode)
         {
             if (zipCode == null) throw new ArgumentNullException(nameof(zipCode));
-            return entries.TryGetValue(BarCode.CheckPostCode(zipCode), out var list) ? Array.AsReadOnly(list) : Array.AsReadOnly(new ZipCodeEntry[0]);
+            return Array.AsReadOnly(FindEntries(BarCode.CheckPostCode(zipCode)) ?? new ZipCodeEntry[0]);
         }
 
         /// <summary>
@@ -146,7 +165,8 @@ namespace ZipConvertCustomerBarCode
         public bool? IsRepresentative(string zipCode)
         {
             if (zipCode == null) throw new ArgumentNullException(nameof(zipCode));
-            if (!entries.TryGetValue(BarCode.CheckPostCode(zipCode), out var list)) return null;
+            var list = FindEntries(BarCode.CheckPostCode(zipCode));
+            if (list == null) return null;
             return list.Any(x => x.IsRepresentative);
         }
 
@@ -156,25 +176,45 @@ namespace ZipConvertCustomerBarCode
         /// <remarks>
         /// 都道府県名の省略、町域名の前の「大字」「字」の有無、空白、全角・半角、「ヶ」と「ケ」の違いは区別しない。
         /// 町域名の括弧書き(「北六条東(1～7丁目)」の「(1～7丁目)」など)は除いて照合する。
+        /// 代表の郵便番号(町域名が「以下に掲載がない場合」)は町域名がわからないため分割しない。
         /// </remarks>
         /// <param name="zipCode">郵便番号(半角・全角数字7桁、ハイフンは可)</param>
         /// <param name="address">住所</param>
         /// <param name="townAddress">住所A(分割できない場合は null)</param>
         /// <param name="blockAddress">住所B(分割できない場合は null)</param>
-        /// <returns>分割できた場合は true。郵便番号データにない場合や、町域名が一致しない場合は false</returns>
+        /// <returns>分割できた場合は true。郵便番号データにない場合、代表の郵便番号の場合、町域名が一致しない場合は false</returns>
         /// <exception cref="ArgumentException">郵便番号が7桁の数値でない場合</exception>
         public bool TrySplitAddress(string zipCode, string address, out string townAddress, out string blockAddress)
         {
             if (zipCode == null) throw new ArgumentNullException(nameof(zipCode));
             if (address == null) throw new ArgumentNullException(nameof(address));
 
+            var list = FindEntries(BarCode.CheckPostCode(zipCode));
+            if (list == null)
+            {
+                townAddress = null;
+                blockAddress = null;
+                return false;
+            }
+            return TrySplitAddress(list, address, out townAddress, out blockAddress);
+        }
+
+        /// <summary>
+        /// 町域名で住所を分割する
+        /// </summary>
+        /// <param name="list">郵便番号の町域</param>
+        /// <param name="address">住所</param>
+        /// <param name="townAddress">住所A(分割できない場合は null)</param>
+        /// <param name="blockAddress">住所B(分割できない場合は null)</param>
+        /// <returns>分割できた場合は true</returns>
+        internal static bool TrySplitAddress(ZipCodeEntry[] list, string address, out string townAddress, out string blockAddress)
+        {
             townAddress = null;
             blockAddress = null;
-            if (!entries.TryGetValue(BarCode.CheckPostCode(zipCode), out var list)) return false;
 
             // 最も長く一致した町域名で分割する
             var end = list.SelectMany(x => x.GetTownAddressCandidates())
-                .Select(x => MatchPrefix(address, x))
+                .Select(x => AddressMatcher.MatchPrefix(address, x))
                 .DefaultIfEmpty(-1)
                 .Max();
             if (end < 0) return false;
@@ -182,37 +222,6 @@ namespace ZipConvertCustomerBarCode
             townAddress = address.Substring(0, end).Trim();
             blockAddress = address.Substring(end);
             return true;
-        }
-
-        /// <summary>
-        /// 住所の先頭が町域名と一致する場合、一致した部分の長さを返す
-        /// </summary>
-        /// <param name="address">住所</param>
-        /// <param name="candidate">町域名までの住所</param>
-        /// <returns>一致した部分の長さ(住所の空白を含む)。一致しない場合は -1</returns>
-        private static int MatchPrefix(string address, string candidate)
-        {
-            int i = 0;
-            foreach (var c in candidate.Where(x => !char.IsWhiteSpace(x)))
-            {
-                while (i < address.Length && char.IsWhiteSpace(address[i])) i++;
-                if (i >= address.Length || Normalize(address[i]) != Normalize(c)) return -1;
-                i++;
-            }
-            return i;
-        }
-
-        /// <summary>
-        /// 照合用の文字の正規化
-        /// </summary>
-        private static char Normalize(char c)
-        {
-            switch (c)
-            {
-                case 'ヶ': return 'ケ';
-                case 'ヵ': return 'カ';
-                default: return BarCode.ToHankaku(c);
-            }
         }
 
         /// <summary>
@@ -273,8 +282,8 @@ namespace ZipConvertCustomerBarCode
         /// </summary>
         internal string GetTownName()
         {
-            // 「以下に掲載がない場合」「○○市の次に番地がくる場合」「○○町一円」は町域名がない
-            if (IsRepresentative || Town.EndsWith(FollowedByBlockNumber, StringComparison.Ordinal)) return "";
+            // 「○○市の次に番地がくる場合」「○○町一円」は町域名がない
+            if (Town.EndsWith(FollowedByBlockNumber, StringComparison.Ordinal)) return "";
             // 「一円」という実在の町域名もあるため、市区町村名 + 一円 の場合のみ
             if (Town.Length > WholeCity.Length && Town.EndsWith(WholeCity, StringComparison.Ordinal)
                 && City.EndsWith(Town.Substring(0, Town.Length - WholeCity.Length), StringComparison.Ordinal))
@@ -293,6 +302,9 @@ namespace ZipConvertCustomerBarCode
         /// </summary>
         internal IEnumerable<string> GetTownAddressCandidates()
         {
+            // 「以下に掲載がない場合」は町域名がわからないため候補なし
+            if (IsRepresentative) yield break;
+
             var town = GetTownName();
             var towns = town.Length == 0 ? new[] { town } : new[] { town, "大字" + town, "字" + town };
             foreach (var t in towns)

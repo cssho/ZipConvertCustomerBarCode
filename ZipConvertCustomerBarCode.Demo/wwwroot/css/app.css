@@ -286,18 +286,34 @@ code, pre {
     border-radius: 4px;
 }
 
-.symbols, .legend {
+/* シンボル列は区切り(スタート・郵便番号・住所表示番号・チェックデジット・ストップ)ごとにまとめ、まとまりの単位で折り返す */
+.symbol-groups {
+    display: flex;
+    flex-wrap: wrap;
+    /* 見出しが2行のまとまり(チェックデジット)があっても、記号の行をそろえる */
+    align-items: flex-end;
+    gap: 12px 10px;
+}
+
+.symbol-group {
+    min-width: 0;
+}
+
+.symbol-group-label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.3;
+    margin-bottom: 4px;
+    white-space: pre;
+}
+
+.symbols {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
     list-style: none;
     padding: 0;
     margin: 0;
-}
-
-.legend {
-    margin-top: 8px;
-    font-size: 0.8rem;
 }
 
 .symbol {
@@ -309,14 +325,10 @@ code, pre {
     text-align: center;
 }
 
-.legend .symbol {
-    font-family: inherit;
-}
-
-.symbol.start { background: var(--start); }
-.symbol.zip { background: var(--zip); }
-.symbol.address { background: var(--address); }
-.symbol.check { background: var(--check); }
+.symbol-group.start .symbol { background: var(--start); }
+.symbol-group.zip .symbol { background: var(--zip); }
+.symbol-group.address .symbol { background: var(--address); }
+.symbol-group.check .symbol { background: var(--check); }
 
 .code {
     background: var(--code-bg);
@@ -328,13 +340,14 @@ code, pre {
     margin: 0;
 }
 
-.card ul {
+/* 「このデモについて」の箇条書き(シンボル列などのリストには当てない) */
+.card > ul {
     margin: 0;
     padding-left: 1.25em;
 }
 
 /* 長いパッケージ名などが狭い画面ではみ出さないよう折り返す */
-.card li code, .details code {
+.card > ul code, .details code {
     overflow-wrap: anywhere;
 }
 

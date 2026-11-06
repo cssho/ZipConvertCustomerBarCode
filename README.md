@@ -1,11 +1,22 @@
 # ZipConvertCustomerBarCode
-郵便番号、住所から郵便物用のカスタマバーコードを生成する
-**[デモ](https://cssho.github.io/ZipConvertCustomerBarCode/)**: ブラウザーで郵便番号と住所を入力して、バーコードを試せます（WebAssembly で動作し、入力内容はどこにも送信しません）。
+郵便番号、住所から郵便物用のカスタマバーコードを生成する .NET ライブラリです。[デモサイト](#デモ)で試せます。
 
 ## カスタマバーコード
 > お客さまがあらかじめ郵便物に印字する場合のバーコードがカスタマバーコードです。カスタマバーコードは、原則として差し出しの必要条件ではなく、料金割引を受けようとする場合に印字するもので、あて名印字と同時に印字できるような仕様としています。
 
 [郵便局 - 郵便番号・バーコードマニュアル](http://www.post.japanpost.jp/zipcode/zipmanual/index.html)
+
+## デモ
+**https://cssho.github.io/ZipConvertCustomerBarCode/**
+
+ブラウザーで郵便番号と住所を入力すると、その場でバーコードを作ります。インストールは不要です。
+
+[![デモサイトの画面: 郵便番号と住所から作ったバーコード、シンボル列、C# のコード例](https://raw.githubusercontent.com/cssho/ZipConvertCustomerBarCode/master/docs/demo.png)](https://cssho.github.io/ZipConvertCustomerBarCode/)
+
+- バーコード、シンボル列（郵便番号・住所表示番号などの区切りごと）、抜き出した住所表示番号を表示します。
+- 画像用と印刷用（実寸）の SVG をダウンロードできます。
+- 入力した内容で同じバーコードを作る C# のコード例を表示します。
+- このライブラリを WebAssembly でそのまま動かしているので、入力内容はどこにも送信しません。郵便番号データ（utf_ken_all.csv）は使っていないため、住所の自動分割や住所から郵便番号を探す機能は試せません。
 
 ## 構成
 .NET Standard 2.0 のライブラリです（コアは .NET 8 以降向けのビルドも含み、住所の照合や郵便番号データの読み込みでメモリの割り当てが少なくなります）。描画方法に合わせてパッケージを選んでください。

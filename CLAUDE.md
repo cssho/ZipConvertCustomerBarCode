@@ -19,7 +19,7 @@
     - `Span` を使うのは計測で効果があった箇所のみ（住所照合の正規化、CSV の読み込み）。`Span` を使わなくても両方で速くできる場合は、`#if` を使わず共通のコードにする。
   - `ZipConvertCustomerBarCode.Drawing`: System.Drawing.Common による描画（Windows のみ）。
   - `ZipConvertCustomerBarCode.SkiaSharp`: SkiaSharp による描画。名前空間は `SkiaSharp` との衝突を避けるため `ZipConvertCustomerBarCode.Skia`。
-- `ZipConvertCustomerBarCode.Demo`: デモサイト（Blazor WebAssembly、net10.0、パッケージにはしない）。コアの `BarCode.Create` と `ToSvg` / `ToPrintSvg` だけを使い、郵便番号データは使わない（12万件あり、ブラウザーで読み込むには重い）。`InvariantGlobalization` で ICU を省いている（コアはカルチャに依存しない）。ソリューションに含めているので、CI の test でビルドされる。
+- `ZipConvertCustomerBarCode.Demo`: デモサイト（Blazor WebAssembly、net10.0、パッケージにはしない）。コアの `BarCode.Create` と `ToSvg` / `ToPrintSvg` だけを使い、郵便番号データは使わない（12万件あり、ブラウザーで読み込むには重い）。`InvariantGlobalization` で ICU を省いている（コアはカルチャに依存しない）。ソリューションに含めているので、CI の test でビルドされる。README の画面のスクリーンショットは `docs/demo.png`（NuGet のパッケージページでも表示されるよう、README からは raw.githubusercontent.com の絶対 URL で参照する）。
   - ローカルでは `dotnet run --project ZipConvertCustomerBarCode.Demo` で起動する。Razor では `@code` が予約語なので、変数名に `code` を使わない。
 - `netstandard2.0` の既定 C# は 7.3。`#if NET8_0_OR_GREATER` の外では `record` や null 許容参照型など新しい構文は使わない。
 - バージョン・著作権表示・パッケージ情報は `Directory.Build.props` にまとめている。パッケージアイコン `icon.png`（128×128）は、このライブラリで作ったバーコードの先頭4シンボル（スタート + 郵便番号3桁）を縦に伸ばし、紺地に白で描いたもの。`dotnet run tools/GenerateIcon.cs -- icon.png` で生成する（色・拡大率・余白もこのスクリプトにある）。デモサイトのファビコン `ZipConvertCustomerBarCode.Demo/wwwroot/icon.png` も同じ画像なので、作り直したらコピーする。
@@ -48,7 +48,7 @@
 - パッケージ作成時の検証（`EnablePackageValidation`）で、net8.0 版から netstandard2.0 版の公開 API が欠けているとエラー（CP0002）になる（net8.0 版にだけ API を足すのは検出しない）。
 - あわせて、公開済みのバージョン（`Directory.Build.props` の `PackageValidationBaselineVersion`）と比べて公開 API を削除・変更していないかも確認する。破壊的変更をするメジャーバージョンアップでは、この基準を外すか更新する。
 - NuGet パッケージの更新も Dependabot が PR にする。`SkiaSharp` とテスト用の `SkiaSharp.NativeAssets.Linux.NoDependencies` はバージョンを揃える必要があるので、グループにまとめて一緒に更新する。
-- `build.yml` は、ドキュメントなどビルドに関係しないファイル（`*.md`・`LICENSE`・`.claude/`・`.github/dependabot.yml`）だけの変更では test と pack をスキップする（`changes` ジョブで判定）。`paths-ignore` を使うと必須チェックが報告されず PR をマージできなくなるので使わない。
+- `build.yml` は、ドキュメントなどビルドに関係しないファイル（`*.md`・`LICENSE`・`docs/`・`.claude/`・`.github/dependabot.yml`）だけの変更では test と pack をスキップする（`changes` ジョブで判定）。`paths-ignore` を使うと必須チェックが報告されず PR をマージできなくなるので使わない。
 - master はルールセットで保護している（PR 経由のみ、`build-result`（test・pack の結果をまとめるジョブ）と verify-lockfile の `verify` の成功が必須）。CI のジョブ名を変えるとマージできなくなるので、ルールセットの必須チェックも合わせて変更する。
 
 ## バーコード処理

@@ -136,3 +136,21 @@ jobs:
       - name: nuget.org に公開
         # .snupkg(シンボルパッケージ)は同じフォルダーにあれば一緒に公開される
         run: dotnet nuget push "artifacts/*.nupkg" --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+  # nuget.org に公開したあと、タグの GitHub Release を作る(リリースノートはマージした PR から自動生成)
+  # 書き込み権限は、Trusted Publishing を扱う publish ジョブとは分けてこのジョブだけに付ける
+  github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: GitHub Release の作成
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          # v2.1.0-beta.1 のような - を含むタグはプレリリースにする
+          prerelease=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then prerelease=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$GITHUB_REF_NAME" "${prerelease[@]}"

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <!--
+    GitHub Pages で公開するデモサイト(Blazor WebAssembly)。パッケージにはしない。
+    郵便番号データ(utf_ken_all.csv)は大きいため使わず、コアの BarCode.Create だけで動かす
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <IsPackable>false</IsPackable>
+    <!-- コアはカルチャに依存しない処理だけなので、ICU のデータを読み込まず軽くする -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.14" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.14" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ZipConvertCustomerBarCode\ZipConvertCustomerBarCode.csproj" />
+  </ItemGroup>
+
+</Project>

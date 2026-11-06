@@ -1,0 +1,213 @@
+﻿<PageTitle>カスタマバーコード デモ | ZipConvertCustomerBarCode</PageTitle>
+
+<header class="site-header">
+    <div class="wrap">
+        <h1><img src="icon.png" alt="" width="32" height="32" /><span>ZipConvertCustomerBarCode デモ</span></h1>
+        <p class="lead">郵便番号と住所から、日本郵便のカスタマバーコードを作ります。入力内容はブラウザーの中だけで処理し、どこにも送信しません。</p>
+        <nav class="links">
+            <a href="https://github.com/cssho/ZipConvertCustomerBarCode">GitHub</a>
+            <a href="https://www.nuget.org/packages/ZipConvertCustomerBarCode">NuGet</a>
+            <a href="https://www.post.japanpost.jp/zipcode/zipmanual/index.html">郵便番号・バーコードマニュアル</a>
+        </nav>
+    </div>
+</header>
+
+<main class="wrap">
+    <section class="card">
+        <h2>入力</h2>
+
+        <div class="samples">
+            <span class="samples-label">例:</span>
+            @foreach (var sample in Samples)
+            {
+                <button type="button" class="sample" @onclick="() => Apply(sample)">@sample.Label</button>
+            }
+        </div>
+
+        <label class="field">
+            <span>郵便番号</span>
+            <input @bind="zipCode" @bind:event="oninput" inputmode="numeric" autocomplete="postal-code" placeholder="263-0023" maxlength="10" />
+        </label>
+
+        <fieldset class="mode">
+            <legend>住所の入力方法</legend>
+            <label><input type="radio" name="mode" checked="@split" @onchange="() => split = true" /> 住所A・住所Bに分けて入力（推奨）</label>
+            <label><input type="radio" name="mode" checked="@(!split)" @onchange="() => split = false" /> 住所をまとめて入力</label>
+        </fieldset>
+
+        @if (split)
+        {
+            <label class="field">
+                <span>住所A（町域名まで）</span>
+                <input @bind="townAddress" @bind:event="oninput" placeholder="東京都千代田区霞が関" />
+            </label>
+            <label class="field">
+                <span>住所B（町域名以降）</span>
+                <input @bind="blockAddress" @bind:event="oninput" placeholder="1丁目3番2号　郵便プラザ503室" />
+            </label>
+        }
+        else
+        {
+            <label class="field">
+                <span>住所</span>
+                <input @bind="address" @bind:event="oninput" autocomplete="street-address" placeholder="千葉市稲毛区緑町3丁目30-8　郵便ビル403号" />
+            </label>
+            <p class="note">
+                住所全体を町域名以降として扱うため、町域名に「丁目」「番」「ノ」などの前の漢数字を含む住所（一番町、八丁堀、三ノ輪 など）では、町域名の数字も住所表示番号として抜き出されてしまいます。
+                その場合は「分けて入力」を使ってください。
+            </p>
+        }
+    </section>
+
+    <section class="card" aria-live="polite">
+        <h2>結果</h2>
+        @{
+            // 入力のたびに作り直す(BarCode.Create は軽いので、ボタンを押さなくても即時に反映する)
+            var (barcode, error) = Generate();
+        }
+        @if (error != null)
+        {
+            <p class="error">@error</p>
+        }
+        else if (barcode == null)
+        {
+            <p class="placeholder">郵便番号（7けた）を入力すると、ここにバーコードが表示されます。</p>
+        }
+        else
+        {
+            <div class="barcode" role="img" aria-label="カスタマバーコード">@((MarkupString)barcode.ToSvg(Scale))</div>
+
+            <div class="downloads">
+                <a class="button" href="@DataUri(barcode.ToSvg(Scale))" download="customer-barcode-@(barcode.ZipCode).svg">画像用 SVG をダウンロード</a>
+                <a class="button secondary" href="@DataUri(barcode.ToPrintSvg())" download="customer-barcode-@(barcode.ZipCode)-print.svg">印刷用 SVG（実寸・10ポイント）をダウンロード</a>
+            </div>
+
+            @if (barcode.IsRepresentativeZipCode)
+            {
+                <p class="warning">
+                    下2けたが「00」のため、代表の郵便番号の可能性があります。代表の郵便番号の郵便物には、カスタマバーコードを付けません。
+                </p>
+            }
+
+            <dl class="details">
+                <dt>郵便番号</dt>
+                <dd><code>@barcode.ZipCode</code></dd>
+                <dt>住所表示番号</dt>
+                <dd>
+                    @if (string.IsNullOrEmpty(barcode.AddressNumber))
+                    {
+                        <span class="muted">（なし）</span>
+                    }
+                    else
+                    {
+                        <code>@barcode.AddressNumber</code>
+                    }
+                    <span class="muted">バーコードに入るのは先頭13けた分です</span>
+                </dd>
+                <dt>シンボル列</dt>
+                <dd>
+                    <ol class="symbols">
+                        @for (var i = 0; i < barcode.Symbols.Count; i++)
+                        {
+                            <li class="symbol @SymbolKind(i)">@barcode.Symbols[i]</li>
+                        }
+                    </ol>
+                    <ul class="legend">
+                        <li class="symbol start">スタート・ストップ</li>
+                        <li class="symbol zip">郵便番号</li>
+                        <li class="symbol address">住所表示番号</li>
+                        <li class="symbol check">チェックデジット</li>
+                    </ul>
+                </dd>
+            </dl>
+
+            <h3>C# で同じバーコードを作る</h3>
+            <pre class="code"><code>@CodeSample</code></pre>
+        }
+    </section>
+
+    <section class="card">
+        <h2>このデモについて</h2>
+        <ul>
+            <li>NuGet パッケージ <code>ZipConvertCustomerBarCode</code> を WebAssembly でそのまま動かしています。</li>
+            <li>郵便番号データ（utf_ken_all.csv）は使っていません。ライブラリでは郵便番号データを読み込むと、住所を自動で住所A・住所Bに分けたり、住所から郵便番号を探したりできます。</li>
+            <li>画像として出力するには、描画パッケージ <code>ZipConvertCustomerBarCode.SkiaSharp</code> または <code>ZipConvertCustomerBarCode.Drawing</code> を使います。</li>
+        </ul>
+    </section>
+</main>
+
+<footer class="wrap footer">
+    <a href="https://github.com/cssho/ZipConvertCustomerBarCode/blob/master/LICENSE">MIT License</a> · © cssho
+</footer>
+
+@code {
+    private const int Scale = 3;
+
+    private record Sample(string Label, string ZipCode, bool Split, string Address, string TownAddress, string BlockAddress);
+
+    private static readonly Sample[] Samples =
+    {
+        new("ビル名あり", "263-0023", false, "千葉市稲毛区緑町3丁目30-8　郵便ビル403号", "", ""),
+        new("英字を含む", "273-0102", false, "千葉県鎌ケ谷市右京塚　東3丁目-20-5　郵便・A&bコーポB604号", "", ""),
+        new("住所A・Bに分ける", "100-0013", true, "", "東京都千代田区霞が関", "1丁目3番2号　郵便プラザ503室"),
+        new("町域名に漢数字", "102-0082", true, "", "東京都千代田区一番町", "5-3"),
+    };
+
+    private string zipCode = "263-0023";
+    private bool split;
+    private string address = "千葉市稲毛区緑町3丁目30-8　郵便ビル403号";
+    private string townAddress = "";
+    private string blockAddress = "";
+
+    private (CustomerBarCode? Code, string? Error) Generate()
+    {
+        if (string.IsNullOrWhiteSpace(zipCode)) return (null, null);
+        try
+        {
+            return (split
+                ? BarCode.Create(zipCode, townAddress ?? "", blockAddress ?? "")
+                : BarCode.Create(zipCode, address ?? ""), null);
+        }
+        catch (ArgumentException)
+        {
+            return (null, "郵便番号は7けたの数字で入力してください（ハイフン・全角数字は可）。");
+        }
+    }
+
+    private void Apply(Sample sample)
+    {
+        zipCode = sample.ZipCode;
+        split = sample.Split;
+        address = sample.Address;
+        townAddress = sample.TownAddress;
+        blockAddress = sample.BlockAddress;
+    }
+
+    // シンボル列の位置ごとの種類: スタート(0)・郵便番号(1〜7)・住所表示番号(8〜20)・チェックデジット(21)・ストップ(22)
+    private static string SymbolKind(int index) => index switch
+    {
+        0 or 22 => "start",
+        <= 7 => "zip",
+        <= 20 => "address",
+        _ => "check",
+    };
+
+    private static string DataUri(string svg) => "data:image/svg+xml;charset=utf-8," + Uri.EscapeDataString(svg);
+
+    private static string Literal(string value) => "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+
+    private string CodeSample
+    {
+        get
+        {
+            var create = split
+                ? $"BarCode.Create({Literal(zipCode)}, {Literal(townAddress)}, {Literal(blockAddress)})"
+                : $"BarCode.Create({Literal(zipCode)}, {Literal(address)})";
+            return "using ZipConvertCustomerBarCode;\n\n"
+                + $"var code = {create};\n"
+                + "string svg = code.ToSvg(scale: 3);          // 画像用(依存ライブラリなし)\n"
+                + "string printSvg = code.ToPrintSvg(point: 10); // 印刷用(mm 単位の実寸)\n"
+                + "// SkiaSharp で PNG にする場合: code.SavePng(\"barcode.png\", scale: 3);";
+        }
+    }
+}

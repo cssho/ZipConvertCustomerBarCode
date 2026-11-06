@@ -45,7 +45,8 @@
 - パッケージ作成時の検証（`EnablePackageValidation`）で、net8.0 版から netstandard2.0 版の公開 API が欠けているとエラー（CP0002）になる（net8.0 版にだけ API を足すのは検出しない）。
 - あわせて、公開済みのバージョン（`Directory.Build.props` の `PackageValidationBaselineVersion`）と比べて公開 API を削除・変更していないかも確認する。破壊的変更をするメジャーバージョンアップでは、この基準を外すか更新する。
 - NuGet パッケージの更新も Dependabot が PR にする。`SkiaSharp` とテスト用の `SkiaSharp.NativeAssets.Linux.NoDependencies` はバージョンを揃える必要があるので、グループにまとめて一緒に更新する。
-- master はルールセットで保護している（PR 経由のみ、CI の test 4 ジョブ・pack・verify-lockfile の成功が必須）。CI のジョブ名を変えるとマージできなくなるので、ルールセットの必須チェックも合わせて変更する。
+- `build.yml` は、ドキュメントなどビルドに関係しないファイル（`*.md`・`LICENSE`・`.claude/`・`.github/dependabot.yml`）だけの変更では test と pack をスキップする（`changes` ジョブで判定）。`paths-ignore` を使うと必須チェックが報告されず PR をマージできなくなるので使わない。
+- master はルールセットで保護している（PR 経由のみ、`build-result`（test・pack の結果をまとめるジョブ）と verify-lockfile の `verify` の成功が必須）。CI のジョブ名を変えるとマージできなくなるので、ルールセットの必須チェックも合わせて変更する。
 
 ## バーコード処理
 

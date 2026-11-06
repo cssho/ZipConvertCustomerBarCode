@@ -23,6 +23,11 @@
       (#if で net8.0 版から API が欠けるとエラー CP0002。net8.0 版にだけ API を足すのは検出しない)
     -->
     <EnablePackageValidation>true</EnablePackageValidation>
+    <!--
+      nuget.org に公開済みのバージョンと比べて、公開 API を削除・変更していないかも確認する
+      (破壊的変更をするメジャーバージョンアップでは、この基準を外すか更新する)
+    -->
+    <PackageValidationBaselineVersion>2.0.0</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">

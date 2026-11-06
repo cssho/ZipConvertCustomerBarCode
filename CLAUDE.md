@@ -43,6 +43,9 @@
 - ワークフローのアクションは `.github/workflows/actions.lock`（`gh actions-lock`）でコミットに固定している。`uses:` を追加・変更したら `gh actions-lock` でロックし直し、`gh actions-lock --verify` で確認してから、ロックファイルとワークフローを一緒にコミットする（ワークフローを編集すると、フックが `--verify-local` で漏れを知らせる）。JSON 出力は `--json=valid,findings` のように `=` でつなぐ（空白区切りだとパスとして解釈される）。
 - CI の `verify-lockfile.yml` が PR・push・週1回でロックファイルを検証する。アクションの更新は Dependabot（`.github/dependabot.yml`、既定の cooldown でリリースから3日待つ）が、ロックファイルの作り直しも含めて PR にする。
 - パッケージ作成時の検証（`EnablePackageValidation`）で、net8.0 版から netstandard2.0 版の公開 API が欠けているとエラー（CP0002）になる（net8.0 版にだけ API を足すのは検出しない）。
+- あわせて、公開済みのバージョン（`Directory.Build.props` の `PackageValidationBaselineVersion`）と比べて公開 API を削除・変更していないかも確認する。破壊的変更をするメジャーバージョンアップでは、この基準を外すか更新する。
+- NuGet パッケージの更新も Dependabot が PR にする。`SkiaSharp` とテスト用の `SkiaSharp.NativeAssets.Linux.NoDependencies` はバージョンを揃える必要があるので、グループにまとめて一緒に更新する。
+- master はルールセットで保護している（PR 経由のみ、CI の test 4 ジョブと verify-lockfile の成功が必須）。CI のジョブ名を変えるとマージできなくなるので、ルールセットの必須チェックも合わせて変更する。
 
 ## バーコード処理
 

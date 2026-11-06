@@ -1,4 +1,4 @@
-# GitHub Actions のアクションの更新
+# GitHub Actions のアクションと NuGet パッケージの更新
 # ワークフローは actions.lock でロックしているが、Dependabot は更新の PR でロックファイルも作り直す
 # 新しいリリースは、Dependabot の既定(cooldown 3日)で、リリースから3日経ってから更新する
 version: 2
@@ -7,3 +7,14 @@ updates:
     directory: /
     schedule:
       interval: weekly
+
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # SkiaSharp と、テスト用のネイティブライブラリ(NativeAssets)はバージョンを揃える必要がある
+      skiasharp:
+        patterns:
+          - SkiaSharp
+          - SkiaSharp.*

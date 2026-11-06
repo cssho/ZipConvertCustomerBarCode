@@ -35,7 +35,7 @@ jobs:
           PUSH_BEFORE: ${{ github.event.before }}
         run: |
           # ビルドに関係しないファイル(これ以外が1つでも変わっていればビルドする)
-          ignore='(\.md$|^LICENSE$|^\.claude/|^\.github/dependabot\.yml$)'
+          ignore='(\.md$|^LICENSE$|^docs/|^\.claude/|^\.github/dependabot\.yml$)'
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             # タグは公開するので常にビルドする
             echo "code=true" >> "$GITHUB_OUTPUT"; exit 0

@@ -104,22 +104,23 @@
                     }
                     <span class="muted">バーコードに入るのは先頭13けた分です</span>
                 </dd>
-                <dt>シンボル列</dt>
-                <dd>
-                    <ol class="symbols">
-                        @for (var i = 0; i < barcode.Symbols.Count; i++)
-                        {
-                            <li class="symbol @SymbolKind(i)">@barcode.Symbols[i]</li>
-                        }
-                    </ol>
-                    <ul class="legend">
-                        <li class="symbol start">スタート・ストップ</li>
-                        <li class="symbol zip">郵便番号</li>
-                        <li class="symbol address">住所表示番号</li>
-                        <li class="symbol check">チェックデジット</li>
-                    </ul>
-                </dd>
             </dl>
+
+            <h3>シンボル列</h3>
+            <div class="symbol-groups">
+                @foreach (var group in SymbolGroups)
+                {
+                    <div class="symbol-group @group.Kind">
+                        <div class="symbol-group-label">@group.Label</div>
+                        <ol class="symbols">
+                            @foreach (var symbol in barcode.Symbols.Skip(group.Start).Take(group.Count))
+                            {
+                                <li class="symbol">@symbol</li>
+                            }
+                        </ol>
+                    </div>
+                }
+            </div>
 
             <h3>C# で同じバーコードを作る</h3>
             <pre class="code"><code>@CodeSample</code></pre>
@@ -183,13 +184,16 @@
         blockAddress = sample.BlockAddress;
     }
 
-    // シンボル列の位置ごとの種類: スタート(0)・郵便番号(1〜7)・住所表示番号(8〜20)・チェックデジット(21)・ストップ(22)
-    private static string SymbolKind(int index) => index switch
+    private record SymbolGroup(string Label, string Kind, int Start, int Count);
+
+    // シンボル列(常に23個)の区切り: スタート・郵便番号7けた・住所表示番号13けた・チェックデジット・ストップ
+    private static readonly SymbolGroup[] SymbolGroups =
     {
-        0 or 22 => "start",
-        <= 7 => "zip",
-        <= 20 => "address",
-        _ => "check",
+        new("スタート", "start", 0, 1),
+        new("郵便番号", "zip", 1, 7),
+        new("住所表示番号（13けた）", "address", 8, 13),
+        new("チェック\nデジット", "check", 21, 1),
+        new("ストップ", "start", 22, 1),
     };
 
     private static string DataUri(string svg) => "data:image/svg+xml;charset=utf-8," + Uri.EscapeDataString(svg);

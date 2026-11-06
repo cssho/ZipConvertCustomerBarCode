@@ -1,0 +1,60 @@
+# デモサイト(ZipConvertCustomerBarCode.Demo、Blazor WebAssembly)を GitHub Pages に配置する
+# https://cssho.github.io/ZipConvertCustomerBarCode/
+# PR ではソリューションのビルド(build.yml の test)でデモもビルドされるので、ここでは master への push だけ動かす
+name: pages
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'ZipConvertCustomerBarCode/**'
+      - 'ZipConvertCustomerBarCode.Demo/**'
+      - 'Directory.Build.props'
+      - 'global.json'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 配置は1つずつ行い、実行中の配置は取り消さない
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6.1.0
+        with:
+          dotnet-version: 10.0.x
+      - name: デモサイトの作成
+        run: dotnet publish ZipConvertCustomerBarCode.Demo -c Release -o publish
+      - name: GitHub Pages 用に調整
+        shell: bash
+        run: |
+          # リポジトリ名のパス(/ZipConvertCustomerBarCode/)で公開されるため、base を書き換える
+          sed -i "s#<base href=\"/\" />#<base href=\"/${GITHUB_REPOSITORY#*/}/\" />#" publish/wwwroot/index.html
+          grep -q "<base href=\"/${GITHUB_REPOSITORY#*/}/\" />" publish/wwwroot/index.html
+          # _framework など _ で始まるフォルダーを Jekyll に無視させない
+          touch publish/wwwroot/.nojekyll
+      - uses: actions/upload-pages-artifact@v5.0.0
+        with:
+          path: publish/wwwroot
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5.0.1

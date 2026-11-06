@@ -1,6 +1,6 @@
 # ZipConvertCustomerBarCode
 郵便番号、住所から郵便物用のカスタマバーコードを生成する
-[ZipConvertCustomerBarCode](http://zipccbc.azurewebsites.net/)
+**[デモ](https://cssho.github.io/ZipConvertCustomerBarCode/)**: ブラウザーで郵便番号と住所を入力して、バーコードを試せます（WebAssembly で動作し、入力内容はどこにも送信しません）。
 
 ## カスタマバーコード
 > お客さまがあらかじめ郵便物に印字する場合のバーコードがカスタマバーコードです。カスタマバーコードは、原則として差し出しの必要条件ではなく、料金割引を受けようとする場合に印字するもので、あて名印字と同時に印字できるような仕様としています。

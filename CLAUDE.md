@@ -20,8 +20,8 @@
   - `ZipConvertCustomerBarCode.Drawing`: System.Drawing.Common による描画（Windows のみ）。
   - `ZipConvertCustomerBarCode.SkiaSharp`: SkiaSharp による描画。名前空間は `SkiaSharp` との衝突を避けるため `ZipConvertCustomerBarCode.Skia`。
 - `netstandard2.0` の既定 C# は 7.3。`#if NET8_0_OR_GREATER` の外では `record` や null 許容参照型など新しい構文は使わない。
-- バージョン・著作権表示・パッケージ情報は `Directory.Build.props` にまとめている。パッケージアイコン `icon.png`（128×128）は、このライブラリで描いたバーコードの先頭4シンボル（スタート + 郵便番号3桁）を縦に伸ばしたもの。
-- 公開メンバーには XML ドキュメントコメントを付ける（`GenerateDocumentationFile` 有効のため、ないと警告になる）。CI（`GITHUB_ACTIONS`）では `TreatWarningsAsErrors` で警告をエラーにしている（依存パッケージの脆弱性の警告 NU1901〜NU1904 は除く）。
+- バージョン・著作権表示・パッケージ情報は `Directory.Build.props` にまとめている。パッケージアイコン `icon.png`（128×128）は、このライブラリで作ったバーコードの先頭4シンボル（スタート + 郵便番号3桁）を縦に伸ばし、紺地に白で描いたもの。`dotnet run tools/GenerateIcon.cs -- icon.png` で生成する（色・拡大率・余白もこのスクリプトにある）。
+- 公開メンバーには XML ドキュメントコメントを付ける（`GenerateDocumentationFile` 有効のため、ないと警告になる）。CI（`GITHUB_ACTIONS`）では `TreatWarningsAsErrors` で警告をエラーにしている（依存パッケージの脆弱性の警告 NU1900〜NU1904 は除く）。ローカルで CI と同じ確認をするときは `dotnet build -p:TreatWarningsAsErrors=true` のように付ける。
 - `.cs` ファイルは UTF-8（BOM 付き、`.editorconfig` にも記載）。新規ファイルにも BOM を付ける（`.claude/settings.json` のフックが Write / Edit 後に自動で補う）。改行は `core.autocrlf=true` に従う（Windows の作業ツリーでは CRLF、リポジトリ内は LF）。
 
 ## テスト

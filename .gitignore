@@ -483,6 +483,9 @@ $RECYCLE.BIN/
 
 ## ZipConvertCustomerBarCode
 
+# Claude Code のフック(.claude/hooks/*.mjs)に npm の依存を足した場合
+node_modules/
+
 # Claude Code の個人用設定(共有する設定は .claude/settings.json)
 .claude/settings.local.json
 

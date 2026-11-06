@@ -153,4 +153,9 @@ jobs:
           # v2.1.0-beta.1 のような - を含むタグはプレリリースにする
           prerelease=()
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then prerelease=(--prerelease); fi
+          # 手で先に作った場合や、ジョブを再実行した場合は、作成済みの Release をそのまま使う
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME は作成済みのため、スキップする"
+            exit 0
+          fi
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$GITHUB_REF_NAME" "${prerelease[@]}"

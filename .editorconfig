@@ -22,6 +22,14 @@ indent_style = tab
 [*.md]
 trim_trailing_whitespace = false
 
+# gh actions-lock が生成するロックファイル(YAML)は、手で整形しない
+[.github/workflows/actions.lock]
+charset = unset
+indent_style = unset
+indent_size = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
 # テストデータは 1.x の出力や実データの形式に合わせているので、エディターで変更しない
 [**/TestData/**]
 charset = unset

@@ -1,0 +1,31 @@
+# エディターの基本設定(Visual Studio・VS Code・Rider など)
+# 改行コードは Git の core.autocrlf に任せるため、end_of_line は指定しない
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# .cs は UTF-8(BOM 付き)
+[*.cs]
+charset = utf-8-bom
+
+[*.{csproj,props,targets,xml,yml,yaml,json,mjs,js}]
+indent_size = 2
+
+[*.sln]
+indent_style = tab
+
+# Markdown は行末の空白2つが改行の意味になるため、削除しない
+[*.md]
+trim_trailing_whitespace = false
+
+# テストデータは 1.x の出力や実データの形式に合わせているので、エディターで変更しない
+[**/TestData/**]
+charset = unset
+indent_style = unset
+indent_size = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset

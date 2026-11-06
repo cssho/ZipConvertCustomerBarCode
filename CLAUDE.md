@@ -39,13 +39,13 @@
 
 - `.github/workflows/build.yml`: push・PR で Ubuntu と Windows × コアの両方のビルドをテストし、パッケージを作る。
 - リリースは `v2.0.0` のようなタグを push すると、タグのバージョンで3パッケージを nuget.org に公開する（Trusted Publishing。ワークフローのファイル名 `build.yml` と Environment 名 `release` を nuget.org に登録しているので、どちらも名前を変えない）。nuget.org 側のポリシーは「新しいバージョンの追加のみ」なので、公開済みのバージョンは出し直せない（修正は次のバージョンで出す）。
-- 公開ジョブは GitHub の `release` Environment で動く（`v*` タグのみ、cssho の承認後に実行。Secret `NUGET_USER` もこの Environment にある）。`Directory.Build.props` の `Version` はローカル用で、公開時はタグが優先される。
+- 公開ジョブは GitHub の `release` Environment で動く（`v*` タグのみ、cssho の承認後に実行。Secret `NUGET_USER` もこの Environment にある）。`Directory.Build.props` の `VersionPrefix` はローカルと CI のプレリリース版（`2.0.0-ci.N`）用で、公開時はタグのバージョンが優先される。`VersionPrefix` は `PackageValidationBaselineVersion` 以上にしておく（低いとアセンブリのバージョンが基準より低くなり CP0003 エラー）。
 - ワークフローのアクションは `.github/workflows/actions.lock`（`gh actions-lock`）でコミットに固定している。`uses:` を追加・変更したら `gh actions-lock` でロックし直し、`gh actions-lock --verify` で確認してから、ロックファイルとワークフローを一緒にコミットする（ワークフローを編集すると、フックが `--verify-local` で漏れを知らせる）。JSON 出力は `--json=valid,findings` のように `=` でつなぐ（空白区切りだとパスとして解釈される）。
 - CI の `verify-lockfile.yml` が PR・push・週1回でロックファイルを検証する。アクションの更新は Dependabot（`.github/dependabot.yml`、既定の cooldown でリリースから3日待つ）が、ロックファイルの作り直しも含めて PR にする。
 - パッケージ作成時の検証（`EnablePackageValidation`）で、net8.0 版から netstandard2.0 版の公開 API が欠けているとエラー（CP0002）になる（net8.0 版にだけ API を足すのは検出しない）。
 - あわせて、公開済みのバージョン（`Directory.Build.props` の `PackageValidationBaselineVersion`）と比べて公開 API を削除・変更していないかも確認する。破壊的変更をするメジャーバージョンアップでは、この基準を外すか更新する。
 - NuGet パッケージの更新も Dependabot が PR にする。`SkiaSharp` とテスト用の `SkiaSharp.NativeAssets.Linux.NoDependencies` はバージョンを揃える必要があるので、グループにまとめて一緒に更新する。
-- master はルールセットで保護している（PR 経由のみ、CI の test 4 ジョブと verify-lockfile の成功が必須）。CI のジョブ名を変えるとマージできなくなるので、ルールセットの必須チェックも合わせて変更する。
+- master はルールセットで保護している（PR 経由のみ、CI の test 4 ジョブ・pack・verify-lockfile の成功が必須）。CI のジョブ名を変えるとマージできなくなるので、ルールセットの必須チェックも合わせて変更する。
 
 ## バーコード処理
 

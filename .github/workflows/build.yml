@@ -43,13 +43,14 @@ jobs:
         shell: bash
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "args=-p:Version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
           else
-            # タグ以外はプレリリース版(公開はしない)
-            echo "version=0.0.0-ci.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+            # タグ以外は Directory.Build.props の VersionPrefix のプレリリース版(公開はしない)
+            # 0.0.0 などにすると、公開済みバージョンとの API 互換性の確認でエラー(CP0003)になる
+            echo "args=-p:VersionSuffix=ci.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
           fi
       - name: パッケージ作成
-        run: dotnet pack ZipConvertCustomerBarCode.sln -c Release -o artifacts -p:Version=${{ steps.version.outputs.version }}
+        run: dotnet pack ZipConvertCustomerBarCode.sln -c Release -o artifacts ${{ steps.version.outputs.args }}
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: packages

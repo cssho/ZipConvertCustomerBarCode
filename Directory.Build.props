@@ -20,6 +20,8 @@
     <RepositoryType>git</RepositoryType>
     <PackageTags>customer-barcode;barcode;japan-post;postal-code;zipcode;カスタマバーコード;郵便番号</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- このライブラリで描いたカスタマバーコードの先頭部分(128x128)。tools/GenerateIcon.cs で生成する -->
+    <PackageIcon>icon.png</PackageIcon>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <!--
@@ -36,10 +38,19 @@
 
   <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <!--
+      CI では警告をエラーにする(XML ドキュメントコメントの付け忘れ CS1591 などを見逃さない)。
+      依存パッケージの脆弱性の警告(NU1901〜NU1904)と、脆弱性データを取得できなかったときの警告(NU1900)は、
+      関係のない PR まで止めないよう警告のままにする(脆弱性は Dependabot の security updates で更新の PR が出る)。
+      ローカルで CI と同じ確認をするときは -p:TreatWarningsAsErrors=true を付ける
+    -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1900;NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
+    <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 
 </Project>

@@ -142,7 +142,7 @@ namespace ZipConvertCustomerBarCode
         /// <summary>
         /// 郵便番号データに含まれるかどうか
         /// </summary>
-        /// <param name="zipCode">郵便番号(半角・全角数字7桁、ハイフンは可)</param>
+        /// <param name="zipCode">郵便番号(半角・全角数字7桁。ハイフン・空白・先頭の〒は可)</param>
         /// <exception cref="ArgumentException">郵便番号が7桁の数値でない場合</exception>
         public bool Contains(string zipCode)
         {
@@ -163,7 +163,7 @@ namespace ZipConvertCustomerBarCode
         /// <summary>
         /// 郵便番号の町域・事業所を返す(1つの郵便番号に複数の町域がある場合がある)
         /// </summary>
-        /// <param name="zipCode">郵便番号(半角・全角数字7桁、ハイフンは可)</param>
+        /// <param name="zipCode">郵便番号(半角・全角数字7桁。ハイフン・空白・先頭の〒は可)</param>
         /// <returns>町域・事業所(郵便番号データにない場合は空)</returns>
         /// <exception cref="ArgumentException">郵便番号が7桁の数値でない場合</exception>
         public IReadOnlyList<ZipCodeEntry> Find(string zipCode)
@@ -175,7 +175,7 @@ namespace ZipConvertCustomerBarCode
         /// <summary>
         /// 代表の郵便番号(町域名が「以下に掲載がない場合」)かどうか
         /// </summary>
-        /// <param name="zipCode">郵便番号(半角・全角数字7桁、ハイフンは可)</param>
+        /// <param name="zipCode">郵便番号(半角・全角数字7桁。ハイフン・空白・先頭の〒は可)</param>
         /// <returns>代表の郵便番号なら true。郵便番号データにない場合は null</returns>
         /// <exception cref="ArgumentException">郵便番号が7桁の数値でない場合</exception>
         public bool? IsRepresentative(string zipCode)
@@ -194,7 +194,7 @@ namespace ZipConvertCustomerBarCode
         /// 町域名の括弧書き(「北六条東(1～7丁目)」の「(1～7丁目)」など)は除いて照合する。
         /// 代表の郵便番号(町域名が「以下に掲載がない場合」)は町域名がわからないため分割しない。
         /// </remarks>
-        /// <param name="zipCode">郵便番号(半角・全角数字7桁、ハイフンは可)</param>
+        /// <param name="zipCode">郵便番号(半角・全角数字7桁。ハイフン・空白・先頭の〒は可)</param>
         /// <param name="address">住所</param>
         /// <param name="townAddress">住所A(分割できない場合は null)</param>
         /// <param name="blockAddress">住所B(分割できない場合は null)</param>

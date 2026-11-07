@@ -81,7 +81,7 @@ namespace ZipConvertCustomerBarCode
         /// 町域名に「特定文字(丁目、番、ノ など)の前の漢数字」を含む住所(一番町、八丁堀、三ノ輪 など)では、
         /// 町域名の漢数字も住所表示番号として抜き出されるため、誤ったバーコードになる。
         /// </remarks>
-        /// <param name="zipCode">郵便番号(半角・全角数字7桁、ハイフンは可)</param>
+        /// <param name="zipCode">郵便番号(半角・全角数字7桁。ハイフン・空白・先頭の〒は可)</param>
         /// <param name="address">住所</param>
         /// <returns>カスタマバーコード</returns>
         /// <exception cref="ArgumentException">郵便番号が7桁の数値でない場合</exception>
@@ -104,7 +104,7 @@ namespace ZipConvertCustomerBarCode
         /// 大口事業所・私書箱の個別郵便番号(事業所の個別郵便番号データを読み込んだ場合)は、マニュアルに従い
         /// 個別番号のみをバーコード化し、住所表示番号は抜き出さない(13けたすべて CC4)。
         /// </remarks>
-        /// <param name="zipCode">郵便番号(半角・全角数字7桁、ハイフンは可)</param>
+        /// <param name="zipCode">郵便番号(半角・全角数字7桁。ハイフン・空白・先頭の〒は可)</param>
         /// <param name="address">住所</param>
         /// <param name="dictionary">郵便番号データ</param>
         /// <returns>カスタマバーコード</returns>
@@ -125,7 +125,7 @@ namespace ZipConvertCustomerBarCode
             }
 
             // 大口事業所・私書箱の個別郵便番号は、個別番号のみをバーコード化し、住所表示番号の13けたは CC4 で埋める
-            // http://www.post.japanpost.jp/zipcode/zipmanual/p22.html
+            // https://www.post.japanpost.jp/zipcode/zipmanual/p22.html
             if (entries.Any(x => x.IsIndividual))
             {
                 return CreateCore(zip, "", false);
@@ -174,9 +174,9 @@ namespace ZipConvertCustomerBarCode
         /// 住所表示番号は住所Bからのみ抜き出す。
         /// 住所Bが住所Aで始まる場合(住所全体が渡された場合)は、住所Aの部分を取り除いてから抜き出す。
         /// 住所Aとの比較では、空白、全角・半角、「ヶ」と「ケ」、漢数字と算用数字の違いは区別しない。
-        /// http://www.post.japanpost.jp/zipcode/zipmanual/p17.html
+        /// https://www.post.japanpost.jp/zipcode/zipmanual/p17.html
         /// </remarks>
-        /// <param name="zipCode">郵便番号(半角・全角数字7桁、ハイフンは可)</param>
+        /// <param name="zipCode">郵便番号(半角・全角数字7桁。ハイフン・空白・先頭の〒は可)</param>
         /// <param name="townAddress">住所A: 町域名までの住所(例: 東京都千代田区霞が関)</param>
         /// <param name="blockAddress">住所B: 町域名以降の住所(例: 1丁目3番2号 郵便プラザ503室)</param>
         /// <returns>カスタマバーコード</returns>
@@ -194,21 +194,25 @@ namespace ZipConvertCustomerBarCode
             return Create(zipCode, blockAddress);
         }
 
+        // 郵便番号の区切りとして読み飛ばす文字(ハイフンのほか、日本語入力で打ちやすい長音・マイナス・ダッシュと空白)
+        private static readonly string PostCodeSeparators = "-‐‑–—―−－ーｰ 　";
+
         /// <summary>
         /// 郵便番号チェック
-        /// ハイフンを除いて数値7桁であること
+        /// 区切り(ハイフン・空白など)と先頭の「〒」を除いて数値7桁であること
         /// </summary>
         /// <param name="zipCode">郵便番号</param>
         /// <returns>郵便番号(半角数字7桁)</returns>
         internal static string CheckPostCode(string zipCode)
         {
-            // 全角→半角にし、ハイフンを除いて半角数字(0～9 のみ。全角以外の Unicode 数字や改行は不可)が7桁であること
+            // 全角→半角にし、区切りと先頭の「〒」を除いて半角数字(0～9 のみ。全角以外の Unicode 数字や改行は不可)が7桁であること
             var digits = new char[7];
             var count = 0;
             foreach (var c in zipCode)
             {
                 var hankaku = ToHankaku(c);
-                if (hankaku == '-') continue;
+                if (PostCodeSeparators.IndexOf(hankaku) >= 0) continue;
+                if (hankaku == '〒' && count == 0) continue;
                 if (hankaku < '0' || hankaku > '9' || count == digits.Length) throw InvalidPostCode();
                 digits[count++] = hankaku;
             }
@@ -242,7 +246,7 @@ namespace ZipConvertCustomerBarCode
             // 全角→半角
             address = string.Join("", address.Select(ToHankaku));
 
-            // http://www.post.japanpost.jp/zipcode/zipmanual/p19.html
+            // https://www.post.japanpost.jp/zipcode/zipmanual/p19.html
             // 1. まず、データ内にあるアルファベットの小文字は大文字に置き換えます。
             // 実行環境のカルチャによらず変換する(tr-TR では i が İ になるため)
             address = address.ToUpperInvariant();
@@ -400,7 +404,7 @@ namespace ZipConvertCustomerBarCode
         {
             // 数値、ハイフンは1けた、アルファベットは英字用制御コードと数字の2けたに変換し、
             // 13けたに満たない場合は CC4 で埋める
-            // http://www.post.japanpost.jp/zipcode/zipmanual/p20.html
+            // https://www.post.japanpost.jp/zipcode/zipmanual/p20.html
             // 合計けた数が20けた(住所表示番号は13けた)を超えた場合、以降の文字については切り捨てます。
             // その際、20～21けた目がアルファベット文字となった場合、20けた目の英字用制御(CC1、CC2、CC3)は残して以降は切り捨てます。
             return address.SelectMany(c => BarcodeCharDic[c.ToString()])

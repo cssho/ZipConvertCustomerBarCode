@@ -30,7 +30,7 @@
 
         <label class="field">
             <span>郵便番号</span>
-            <input @bind="zipCode" @bind:event="oninput" inputmode="numeric" autocomplete="postal-code" placeholder="263-0023" maxlength="10" />
+            <input @bind="zipCode" @bind:event="oninput" inputmode="numeric" autocomplete="postal-code" placeholder="263-0023" maxlength="16" />
         </label>
 
         <fieldset class="mode">
@@ -63,12 +63,14 @@
         }
     </section>
 
-    <section class="card" aria-live="polite">
+    <section class="card">
         <h2>結果</h2>
         @{
             // 入力のたびに作り直す(BarCode.Create は軽いので、ボタンを押さなくても即時に反映する)
             var (barcode, error) = Generate();
         }
+        @* 結果全体を読み上げると入力のたびにシンボル列まで読まれるため、状態の短い文だけを読み上げる *@
+        <p class="visually-hidden" aria-live="polite">@(error ?? (barcode == null ? "" : $"郵便番号 {barcode.ZipCode} のバーコードを作りました。"))</p>
         @if (error != null)
         {
             <p class="error">@error</p>
@@ -211,11 +213,12 @@
             var create = split
                 ? $"BarCode.Create({Literal(zipCode)}, {Literal(townAddress)}, {Literal(blockAddress)})"
                 : $"BarCode.Create({Literal(zipCode)}, {Literal(address)})";
-            return "using ZipConvertCustomerBarCode;\n\n"
+            return "using ZipConvertCustomerBarCode;\n"
+                + "using ZipConvertCustomerBarCode.Skia; // SavePng を使う場合(ZipConvertCustomerBarCode.SkiaSharp パッケージ)\n\n"
                 + $"var code = {create};\n"
                 + "string svg = code.ToSvg(scale: 3);          // 画像用(依存ライブラリなし)\n"
                 + "string printSvg = code.ToPrintSvg(point: 10); // 印刷用(mm 単位の実寸)\n"
-                + "// SkiaSharp で PNG にする場合: code.SavePng(\"barcode.png\", scale: 3);";
+                + "code.SavePng(\"barcode.png\", scale: 3);       // PNG(SkiaSharp)";
         }
     }
 }

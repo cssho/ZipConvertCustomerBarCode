@@ -3,7 +3,7 @@
 namespace ZipConvertCustomerBarCode.Tests
 {
     // 印刷用の実寸
-    // http://www.post.japanpost.jp/zipcode/zipmanual/p12.html
+    // https://www.post.japanpost.jp/zipcode/zipmanual/p12.html
     public class PrintTests
     {
         private readonly CustomerBarCode code = BarCode.Create("1000013", "東京都千代田区霞が関", "1丁目3番2号　郵便プラザ503室");

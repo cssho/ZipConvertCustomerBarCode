@@ -47,13 +47,13 @@
 - CI の `verify-lockfile.yml` が PR・push・週1回でロックファイルを検証する。アクションの更新は Dependabot（`.github/dependabot.yml`、既定の cooldown でリリースから3日待つ）が、ロックファイルの作り直しも含めて PR にする。
 - パッケージ作成時の検証（`EnablePackageValidation`）で、net8.0 版から netstandard2.0 版の公開 API が欠けているとエラー（CP0002）になる（net8.0 版にだけ API を足すのは検出しない）。
 - あわせて、公開済みのバージョン（`Directory.Build.props` の `PackageValidationBaselineVersion`）と比べて公開 API を削除・変更していないかも確認する。破壊的変更をするメジャーバージョンアップでは、この基準を外すか更新する。
-- NuGet パッケージの更新も Dependabot が PR にする。`SkiaSharp` とテスト用の `SkiaSharp.NativeAssets.Linux.NoDependencies` はバージョンを揃える必要があるので、グループにまとめて一緒に更新する。
+- NuGet パッケージの更新も Dependabot が PR にする。`SkiaSharp` とテスト用の `SkiaSharp.NativeAssets.Linux.NoDependencies` はバージョンを揃える必要があるので、グループにまとめて一緒に更新する。デモの `Microsoft.AspNetCore.Components.WebAssembly` と `...DevServer` も同様にグループにしている。
 - `build.yml` は、ドキュメントなどビルドに関係しないファイル（`*.md`・`LICENSE`・`docs/`・`.claude/`・`.github/dependabot.yml`）だけの変更では test と pack をスキップする（`changes` ジョブで判定）。`paths-ignore` を使うと必須チェックが報告されず PR をマージできなくなるので使わない。
 - master はルールセットで保護している（PR 経由のみ、`build-result`（test・pack の結果をまとめるジョブ）と verify-lockfile の `verify` の成功が必須）。CI のジョブ名を変えるとマージできなくなるので、ルールセットの必須チェックも合わせて変更する。
 
 ## バーコード処理
 
-- 住所の変換（`BarCode.cs`）は日本郵便のバーコードマニュアル（http://www.post.japanpost.jp/zipcode/zipmanual/p19.html）に従う。コード中の番号付きコメント（1.〜6.、補足ルール1〜5）はマニュアルの手順番号に対応している。
+- 住所の変換（`BarCode.cs`）は日本郵便のバーコードマニュアル（https://www.post.japanpost.jp/zipcode/zipmanual/p19.html）に従う。コード中の番号付きコメント（1.〜6.、補足ルール1〜5）はマニュアルの手順番号に対応している。
 - マニュアルでは住所を「住所A（町域名まで）」と「住所B（町域名以降）」に分け、住所Bだけから抜き出す。`Create(郵便番号, 住所)` は住所全体を住所Bとして扱うため、町域名に特定文字の前の漢数字を含む住所（一番町、八丁堀など）では誤る。これは既知の制限で、`Create(郵便番号, 住所A, 住所B)` か `ZipCodeDictionary` を渡す `Create` を推奨している。
 - バーコードは常に 23 シンボル: スタート + 郵便番号 7 桁 + 住所表示番号 13 枠（不足分は `CC4` で埋める）+ チェックデジット + ストップ。
 - バーの形は `CustomerBarCode.cs` の `BarPatternDic` で定義（1 シンボル = 幅 12px に 3 本、x=0/4/8、幅 2px、上・中・下段 各 4px）。この表は旧バージョンの GIF 画像とピクセル単位で一致することを確認済みなので、変更するときは既存出力と比較する。

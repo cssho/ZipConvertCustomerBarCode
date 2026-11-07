@@ -64,7 +64,7 @@ namespace ZipConvertCustomerBarCode
         /// 代表の郵便番号(郵便番号簿の「以下に掲載がない場合」の番号)の郵便物には、カスタマバーコードを付けない。
         /// 郵便番号データ(<see cref="ZipCodeDictionary"/>)を渡して生成した場合は、郵便番号データに基づいて判定する。
         /// 渡さずに生成した場合は、マニュアルの「原則として下2けたが"00"」に従って判定する目安。
-        /// http://www.post.japanpost.jp/zipcode/zipmanual/p18.html
+        /// https://www.post.japanpost.jp/zipcode/zipmanual/p18.html
         /// </remarks>
         public bool IsRepresentativeZipCode { get; }
 
@@ -157,7 +157,7 @@ namespace ZipConvertCustomerBarCode
         /// </summary>
         /// <remarks>
         /// 寸法は郵便番号・バーコードマニュアルに従う(10ポイントのときバー幅0.6mm、バーピッチ1.2mm、ロングバー3.6mm)。
-        /// http://www.post.japanpost.jp/zipcode/zipmanual/p12.html
+        /// https://www.post.japanpost.jp/zipcode/zipmanual/p12.html
         /// </remarks>
         /// <param name="point">大きさ(8～11.5ポイント)</param>
         /// <returns>バー配置</returns>

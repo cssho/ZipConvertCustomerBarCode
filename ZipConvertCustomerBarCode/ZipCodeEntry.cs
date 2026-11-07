@@ -27,7 +27,7 @@ namespace ZipConvertCustomerBarCode
     public sealed class ZipCodeEntry
     {
         // 町域名の特殊な値
-        // http://www.post.japanpost.jp/zipcode/dl/utf-readme.html
+        // https://www.post.japanpost.jp/zipcode/dl/utf-readme.html
         private const string NotListed = "以下に掲載がない場合";
         private const string FollowedByBlockNumber = "の次に番地がくる場合";
         private const string WholeCity = "一円";

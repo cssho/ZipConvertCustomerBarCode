@@ -6,7 +6,7 @@
       それ以外は -p:VersionSuffix=ci.N でプレリリース版(2.0.0-ci.N)にする。
       アセンブリのバージョンがここから決まり、PackageValidationBaselineVersion 以上である必要がある
     -->
-    <VersionPrefix>2.0.0</VersionPrefix>
+    <VersionPrefix>2.1.0</VersionPrefix>
     <Authors>cssho</Authors>
     <Product>ZipConvertCustomerBarCode</Product>
     <Copyright>Copyright (c) 2015 cssho</Copyright>

@@ -45,6 +45,8 @@ dotnet add package ZipConvertCustomerBarCode.SkiaSharp   # SkiaSharp で描画�
 dotnet add package ZipConvertCustomerBarCode.Drawing     # System.Drawing で描画する場合
 ```
 
+2.1.0 より後のバージョンは、[GitHub Release](https://github.com/cssho/ZipConvertCustomerBarCode/releases) に GitHub Actions でビルドしたことを証明したパッケージを添付しています。`gh attestation verify ZipConvertCustomerBarCode.x.y.z.nupkg --repo cssho/ZipConvertCustomerBarCode` で確認できます（nuget.org から取得したものは、nuget.org の署名が付いてファイルが変わるため確認できません）。
+
 ## 使い方
 ### バーコード生成
 ```csharp

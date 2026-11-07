@@ -1,4 +1,11 @@
 # ZipConvertCustomerBarCode
+
+[![build](https://github.com/cssho/ZipConvertCustomerBarCode/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/cssho/ZipConvertCustomerBarCode/actions/workflows/build.yml)
+[![NuGet](https://img.shields.io/nuget/v/ZipConvertCustomerBarCode)](https://www.nuget.org/packages/ZipConvertCustomerBarCode)
+[![NuGet のダウンロード数](https://img.shields.io/nuget/dt/ZipConvertCustomerBarCode)](https://www.nuget.org/packages/ZipConvertCustomerBarCode)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/cssho/ZipConvertCustomerBarCode/blob/master/LICENSE)
+![対応フレームワーク: netstandard2.0 | net8.0](https://img.shields.io/badge/.NET-netstandard2.0%20%7C%20net8.0-512BD4)
+
 郵便番号、住所から郵便物用のカスタマバーコードを生成する .NET ライブラリです。[デモサイト](#デモ)で試せます。
 
 ## カスタマバーコード

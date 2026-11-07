@@ -18,3 +18,7 @@ updates:
         patterns:
           - SkiaSharp
           - SkiaSharp.*
+      # デモサイト(Blazor WebAssembly)のパッケージも、同じバージョンに揃える必要がある
+      blazor-webassembly:
+        patterns:
+          - Microsoft.AspNetCore.Components.WebAssembly*

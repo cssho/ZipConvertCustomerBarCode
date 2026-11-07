@@ -11,7 +11,7 @@
 ## カスタマバーコード
 > お客さまがあらかじめ郵便物に印字する場合のバーコードがカスタマバーコードです。カスタマバーコードは、原則として差し出しの必要条件ではなく、料金割引を受けようとする場合に印字するもので、あて名印字と同時に印字できるような仕様としています。
 
-[郵便局 - 郵便番号・バーコードマニュアル](http://www.post.japanpost.jp/zipcode/zipmanual/index.html)
+[郵便局 - 郵便番号・バーコードマニュアル](https://www.post.japanpost.jp/zipcode/zipmanual/index.html)
 
 ## デモ
 **https://cssho.github.io/ZipConvertCustomerBarCode/**
@@ -53,7 +53,7 @@ using ZipConvertCustomerBarCode;
 // 郵便番号, 住所A(町域名までの住所), 住所B(町域名以降の住所)
 CustomerBarCode code = BarCode.Create("1000013", "東京都千代田区霞が関", "1丁目3番2号　郵便プラザ503室");
 ```
-郵便番号が7桁の数値でない場合は `ArgumentException` になります。
+郵便番号は全角数字でもよく、ハイフン・長音（ー）などの区切り、空白、先頭の「〒」は読み飛ばします。7桁の数値でない場合は `ArgumentException` になります。
 
 住所表示番号は、[郵便番号・バーコードマニュアル](https://www.post.japanpost.jp/zipcode/zipmanual/p19.html)の抜き出しルール（補足ルールを含む）に従って住所Bから抜き出します。
 「丁目・番地・号」などの前の漢数字は算用数字に変換し（例：十一丁目 → 11）、「2F」のような階数の F は抜き出しません。
@@ -86,6 +86,7 @@ CustomerBarCode code = BarCode.Create("1020082", "東京都千代田区一番町
 - 代表の郵便番号（町域名が「以下に掲載がない場合」）は町域名がわからないため、分割しません。
 - `IsRepresentativeZipCode` は郵便番号データに基づいて判定します。郵便番号データにない番号（郵便番号データより新しい番号など）は、下2けたで判定します。
 - 従来の Shift_JIS 形式（KEN_ALL.CSV）は、長い町域名が複数行に分かれているため対象外です。
+
 ### 事業所の個別郵便番号データを使う
 日本郵便の[事業所の個別郵便番号データ](https://www.post.japanpost.jp/zipcode/dl/jigyosyo/index-zip.html)（`jigyosyo.zip`、Shift_JIS）も一緒に読み込むと、大口事業所・私書箱の個別郵便番号を扱えます。
 

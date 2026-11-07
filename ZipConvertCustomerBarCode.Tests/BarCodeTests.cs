@@ -14,7 +14,7 @@ namespace ZipConvertCustomerBarCode.Tests
         }
 
         // 住所表示番号は13けたまで。13けた目がアルファベットの場合は英字用制御コードのみ残す
-        // http://www.post.japanpost.jp/zipcode/zipmanual/p20.html
+        // https://www.post.japanpost.jp/zipcode/zipmanual/p20.html
         [Theory]
         // マニュアル p20 の例
         [InlineData("9100067", "福井県福井市新田塚3丁目80-25　J1ビル2-B", "STC 9 1 0 0 0 6 7 3 - 8 0 - 2 5 CC1 9 1 - 2 CC1 9 SPC")]
@@ -36,7 +36,15 @@ namespace ZipConvertCustomerBarCode.Tests
         [InlineData("０１４０１１３")]
         [InlineData("０１４‐０１１３")]
         [InlineData("０１４－０１１３")]
-        public void 郵便番号は全角とハイフンを受け付ける(string zipCode)
+        // 日本語入力で打ちやすい区切り(長音・マイナス)、空白、先頭の〒
+        [InlineData("014ー0113")]
+        [InlineData("０１４ー０１１３")]
+        [InlineData("014−0113")]
+        [InlineData("014 0113")]
+        [InlineData(" 014-0113　")]
+        [InlineData("〒014-0113")]
+        [InlineData("〒 014-0113")]
+        public void 郵便番号は全角と区切りと先頭の郵便マークを受け付ける(string zipCode)
         {
             var code = BarCode.Create(zipCode, "添60-1");
 
@@ -48,8 +56,10 @@ namespace ZipConvertCustomerBarCode.Tests
         [InlineData("014011")]
         [InlineData("01401130")]
         [InlineData("014011A")]
-        [InlineData("014 0113")]
         [InlineData("0140113\n")]
+        [InlineData("014\t0113")]
+        [InlineData("014〒0113")]
+        [InlineData("〒")]
         // アラビア・インド数字
         [InlineData("٠١٤٠١١٣")]
         public void 郵便番号が7桁の数値でなければ例外(string zipCode)

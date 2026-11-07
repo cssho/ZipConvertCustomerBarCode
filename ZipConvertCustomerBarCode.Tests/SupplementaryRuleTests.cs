@@ -4,7 +4,7 @@ namespace ZipConvertCustomerBarCode.Tests
 {
     // 抜き出しの基本ルール・補足ルール
     // 期待値はマニュアルの「バーコード・データ」
-    // http://www.post.japanpost.jp/zipcode/zipmanual/p19.html
+    // https://www.post.japanpost.jp/zipcode/zipmanual/p19.html
     public class SupplementaryRuleTests
     {
         [Theory]

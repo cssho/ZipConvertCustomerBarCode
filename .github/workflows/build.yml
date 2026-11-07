@@ -74,6 +74,22 @@ jobs:
       - name: テスト
         run: dotnet test -p:CoreTargetFramework=${{ matrix.core }}
 
+  # .editorconfig の書式(インデント・BOM・改行など)に従っているか
+  format:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6.1.0
+        with:
+          dotnet-version: 10.0.x
+      - name: 書式の確認
+        # 崩れている場合は、ローカルで dotnet format ZipConvertCustomerBarCode.sln を実行して直す
+        run: dotnet format ZipConvertCustomerBarCode.sln --verify-no-changes
+
   pack:
     needs: test
     # test がスキップされると pack もスキップされる
@@ -101,11 +117,11 @@ jobs:
           name: packages
           path: artifacts/
 
-  # ルールセットの必須チェック。test・pack のどれかが失敗・キャンセルされたら失敗、
+  # ルールセットの必須チェック。test・format・pack のどれかが失敗・キャンセルされたら失敗、
   # すべて成功またはスキップ(ドキュメントだけの変更)なら成功する
   build-result:
     if: always()
-    needs: [changes, test, pack]
+    needs: [changes, test, format, pack]
     runs-on: ubuntu-latest
     steps:
       - name: 結果の確認
@@ -119,12 +135,20 @@ jobs:
     # release Environment: v* タグのみ・承認後に実行。nuget.org の Trusted Publishing のポリシーもこの Environment に限定している
     environment: release
     permissions:
-      id-token: write  # Trusted Publishing の短期間の API キーを取得するため
+      id-token: write  # Trusted Publishing の短期間の API キーの取得と、出所の証明の署名のため
+      attestations: write  # 出所の証明を保存するため
+      artifact-metadata: write  # 出所の証明の対象を記録するため
     steps:
       - uses: actions/download-artifact@v8.0.2
         with:
           name: packages
           path: artifacts
+      - name: パッケージの出所の証明
+        # このワークフローで作ったパッケージであることを証明する(gh attestation verify で確認できる)。
+        # nuget.org は公開時にリポジトリ署名を付けてファイルが変わるため、確認には GitHub Release に添付したパッケージを使う
+        uses: actions/attest@v4.2.2
+        with:
+          subject-path: 'artifacts/*.nupkg'
       - uses: actions/setup-dotnet@v6.1.0
         with:
           dotnet-version: 10.0.x
@@ -137,7 +161,8 @@ jobs:
         # .snupkg(シンボルパッケージ)は同じフォルダーにあれば一緒に公開される
         run: dotnet nuget push "artifacts/*.nupkg" --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
-  # nuget.org に公開したあと、タグの GitHub Release を作る(リリースノートはマージした PR から自動生成)
+  # nuget.org に公開したあと、タグの GitHub Release を作り、出所を証明したパッケージを添付する
+  # (リリースノートはマージした PR から自動生成)
   # 書き込み権限は、Trusted Publishing を扱う publish ジョブとは分けてこのジョブだけに付ける
   github-release:
     needs: publish
@@ -145,17 +170,22 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          name: packages
+          path: artifacts
       - name: GitHub Release の作成
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          # 手で先に作った場合や、ジョブを再実行した場合は、作成済みの Release にパッケージだけ添付する
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME は作成済みのため、パッケージだけ添付する"
+            gh release upload "$GITHUB_REF_NAME" artifacts/*.nupkg --repo "$GITHUB_REPOSITORY" --clobber
+            exit 0
+          fi
           # v2.1.0-beta.1 のような - を含むタグはプレリリースにする
           prerelease=()
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then prerelease=(--prerelease); fi
-          # 手で先に作った場合や、ジョブを再実行した場合は、作成済みの Release をそのまま使う
-          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            echo "Release $GITHUB_REF_NAME は作成済みのため、スキップする"
-            exit 0
-          fi
-          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$GITHUB_REF_NAME" "${prerelease[@]}"
+          gh release create "$GITHUB_REF_NAME" artifacts/*.nupkg --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$GITHUB_REF_NAME" "${prerelease[@]}"

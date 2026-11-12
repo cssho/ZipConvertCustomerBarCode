@@ -11,7 +11,7 @@
   <ItemGroup>
     <PackageReference Include="xunit.v3" Version="4.0.2" />
     <!-- Linux(CI)で SkiaSharp のテストを動かすためのネイティブライブラリ -->
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.155.0" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.156.0" />
     <Using Include="Xunit" />
   </ItemGroup>
 

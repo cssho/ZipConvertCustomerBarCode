@@ -31,7 +31,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-dotnet@v6.1.0
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 11.0.x
       - name: デモサイトの作成
         run: dotnet publish ZipConvertCustomerBarCode.Demo -c Release -o publish
       - name: GitHub Pages 用に調整

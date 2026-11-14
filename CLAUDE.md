@@ -19,7 +19,7 @@
     - `Span` を使うのは計測で効果があった箇所のみ（住所照合の正規化、CSV の読み込み）。`Span` を使わなくても両方で速くできる場合は、`#if` を使わず共通のコードにする。
   - `ZipConvertCustomerBarCode.Drawing`: System.Drawing.Common による描画（Windows のみ）。
   - `ZipConvertCustomerBarCode.SkiaSharp`: SkiaSharp による描画。名前空間は `SkiaSharp` との衝突を避けるため `ZipConvertCustomerBarCode.Skia`。
-- `ZipConvertCustomerBarCode.Demo`: デモサイト（Blazor WebAssembly、net10.0、パッケージにはしない）。コアの `BarCode.Create` と `ToSvg` / `ToPrintSvg` だけを使い、郵便番号データは使わない（12万件あり、ブラウザーで読み込むには重い）。`InvariantGlobalization` で ICU を省いている（コアはカルチャに依存しない）。ソリューションに含めているので、CI の test でビルドされる。README の画面のスクリーンショットは `docs/demo.png`（NuGet のパッケージページでも表示されるよう、README からは raw.githubusercontent.com の絶対 URL で参照する）。
+- `ZipConvertCustomerBarCode.Demo`: デモサイト（Blazor WebAssembly、net11.0、パッケージにはしない）。コアの `BarCode.Create` と `ToSvg` / `ToPrintSvg` だけを使い、郵便番号データは使わない（12万件あり、ブラウザーで読み込むには重い）。`InvariantGlobalization` で ICU を省いている（コアはカルチャに依存しない）。ソリューションに含めているので、CI の test でビルドされる。README の画面のスクリーンショットは `docs/demo.png`（NuGet のパッケージページでも表示されるよう、README からは raw.githubusercontent.com の絶対 URL で参照する）。
   - ローカルでは `dotnet run --project ZipConvertCustomerBarCode.Demo` で起動する。Razor では `@code` が予約語なので、変数名に `code` を使わない。
 - `netstandard2.0` の既定 C# は 7.3。`#if NET8_0_OR_GREATER` の外では `record` や null 許容参照型など新しい構文は使わない。
 - バージョン・著作権表示・パッケージ情報は `Directory.Build.props` にまとめている。パッケージアイコン `icon.png`（128×128）は、このライブラリで作ったバーコードの先頭4シンボル（スタート + 郵便番号3桁）を縦に伸ばし、紺地に白で描いたもの。`dotnet run tools/GenerateIcon.cs -- icon.png` で生成する（色・拡大率・余白もこのスクリプトにある）。デモサイトのファビコン `ZipConvertCustomerBarCode.Demo/wwwroot/icon.png` も同じ画像なので、作り直したらコピーする。
@@ -28,7 +28,7 @@
 
 ## テスト
 
-- `dotnet test` で実行（xUnit v3、net10.0）。`global.json` で Microsoft.Testing.Platform を指定しているため、`Microsoft.NET.Test.Sdk` や `xunit.runner.visualstudio` は追加しない。
+- `dotnet test` で実行（xUnit v3、net11.0）。`global.json` で Microsoft.Testing.Platform を指定しているため、`Microsoft.NET.Test.Sdk` や `xunit.runner.visualstudio` は追加しない。
 - コアは `#if` で処理が分かれるため、変更したら両方のビルドでテストする: `dotnet test`（net8.0 版）と `dotnet test -p:CoreTargetFramework=netstandard2.0`。`TargetFrameworkTests` が、指定したビルドが実際に使われていることを確認する。
 - `TestData/cases.tsv` と `v1-*.png` は 1.x（.NET Framework 版）の出力で、シンボル列と画像がこれとピクセル単位で一致することを確認している。1.x がマニュアルと異なっていたケース（補足ルール対象など）は除いてあり、それらは `SupplementaryRuleTests` でマニュアルの「バーコード・データ」を期待値にしている。出力が変わる修正をした場合は、マニュアルに照らして意図した変更か確認してから期待値を更新する。
 - `cases.tsv` はタブ区切り（郵便番号・住所・シンボル列・画像ファイル名）。住所が空の行があるので、シェルで加工するときは連続するタブがまとめられないよう注意する。

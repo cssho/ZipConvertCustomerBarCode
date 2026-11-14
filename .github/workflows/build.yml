@@ -70,7 +70,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-dotnet@v6.1.0
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 11.0.x
       - name: テスト
         run: dotnet test -p:CoreTargetFramework=${{ matrix.core }}
 
@@ -85,7 +85,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-dotnet@v6.1.0
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 11.0.x
       - name: 書式の確認
         # 崩れている場合は、ローカルで dotnet format ZipConvertCustomerBarCode.sln を実行して直す
         run: dotnet format ZipConvertCustomerBarCode.sln --verify-no-changes
@@ -98,7 +98,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-dotnet@v6.1.0
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 11.0.x
       - name: バージョン
         id: version
         shell: bash
@@ -151,7 +151,7 @@ jobs:
           subject-path: 'artifacts/*.nupkg'
       - uses: actions/setup-dotnet@v6.1.0
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 11.0.x
       - name: NuGet ログイン(Trusted Publishing)
         id: login
         uses: NuGet/login@v1.2.0

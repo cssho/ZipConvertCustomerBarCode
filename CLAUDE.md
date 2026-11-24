@@ -48,6 +48,7 @@
 - パッケージ作成時の検証（`EnablePackageValidation`）で、net8.0 版から netstandard2.0 版の公開 API が欠けているとエラー（CP0002）になる（net8.0 版にだけ API を足すのは検出しない）。
 - あわせて、公開済みのバージョン（`Directory.Build.props` の `PackageValidationBaselineVersion`）と比べて公開 API を削除・変更していないかも確認する。新しいバージョンを公開したら、この基準も公開したバージョンに上げる。破壊的変更をするメジャーバージョンアップでは、この基準を外すか更新する。
 - NuGet パッケージの更新も Dependabot が PR にする。`SkiaSharp` とテスト用の `SkiaSharp.NativeAssets.Linux.NoDependencies` はバージョンを揃える必要があるので、グループにまとめて一緒に更新する。デモの `Microsoft.AspNetCore.Components.WebAssembly` と `...DevServer` も同様にグループにしている。
+  - 2026年11月時点で Dependabot の SDK（10.0.400）は .NET 11 に対応しておらず、net11.0 の Tests と Demo のパッケージを検出できない（ジョブは成功扱いで、ログに `NETSDK1045` が出るだけ）。その間は Tests・Demo のパッケージは更新されず、`SkiaSharp` の PR も本体だけが上がるので、テスト用の `SkiaSharp.NativeAssets.Linux.NoDependencies` を手で同じバージョンに揃えてからマージする（揃えないと Linux のテストがネイティブライブラリのバージョン不一致で失敗する）。Dependabot が対応したら、この項目は削除する。
 - `build.yml` は、ドキュメントなどビルドに関係しないファイル（`*.md`・`LICENSE`・`docs/`・`.claude/`・`.github/dependabot.yml`）だけの変更では test と pack をスキップする（`changes` ジョブで判定）。`paths-ignore` を使うと必須チェックが報告されず PR をマージできなくなるので使わない。
 - master はルールセットで保護している（PR 経由のみ、`build-result`（test・format・pack の結果をまとめるジョブ）と verify-lockfile の `verify` の成功が必須）。CI のジョブ名を変えるとマージできなくなるので、ルールセットの必須チェックも合わせて変更する。
 
